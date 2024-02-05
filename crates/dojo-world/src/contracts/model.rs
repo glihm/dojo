@@ -49,6 +49,7 @@ pub enum ModelError {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 pub trait ModelReader<E> {
+    fn class_hash(&self) -> FieldElement;
     fn contract_address(&self) -> FieldElement;
     async fn schema(&self) -> Result<Ty, E>;
     async fn packed_size(&self) -> Result<FieldElement, E>;
@@ -59,6 +60,8 @@ pub trait ModelReader<E> {
 pub struct ModelRPCReader<'a, P: Provider + Sync + Send> {
     /// The name of the model
     name: FieldElement,
+    /// The class hash of the model
+    class_hash: FieldElement,
     /// The contract address of the model
     contract_address: FieldElement,
     /// Contract reader of the World that the model is registered to.
@@ -77,7 +80,7 @@ where
     ) -> Result<ModelRPCReader<'a, P>, ModelError> {
         let name = cairo_short_string_to_felt(name)?;
 
-        let contract_address =
+        let (class_hash, contract_address) =
             world.model(&name).block_id(world.block_id).call().await.map_err(|err| match err {
                 CainomeError::Provider(ProviderError::StarknetError(
                     StarknetError::ContractNotFound,
@@ -87,7 +90,7 @@ where
 
         let model_reader = ModelContractReader::new(contract_address.into(), world.provider());
 
-        Ok(Self { world_reader: world, contract_address: contract_address.into(), name, model_reader })
+        Ok(Self { world_reader: world, class_hash: class_hash.into(), contract_address: contract_address.into(), name, model_reader })
     }
 
     pub async fn entity_storage(
@@ -139,6 +142,10 @@ impl<'a, P> ModelReader<ModelError> for ModelRPCReader<'a, P>
 where
     P: Provider + Sync + Send,
 {
+    fn class_hash(&self) -> FieldElement {
+        self.class_hash
+    }
+
     fn contract_address(&self) -> FieldElement {
         self.contract_address
     }

@@ -369,7 +369,7 @@ fn get_dojo_contract_artifacts(
     aux_data
         .contracts
         .iter()
-        .filter(|name| !matches!(name.as_ref(), "world" | "base"))
+        .filter(|name| !matches!(name.as_ref(), "world" | "resource_metadata" | "base"))
         .filter(|_name| {
             let module_name = module_id.full_path(db);
             compiled_classes.get(module_name.as_str()).cloned().is_some()

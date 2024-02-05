@@ -24,6 +24,7 @@ pub struct MigrationStrategy {
     pub world_address: Option<FieldElement>,
     pub world: Option<ContractMigration>,
     pub base: Option<ClassMigration>,
+    pub resource_metadata: Option<ClassMigration>,
     pub contracts: Vec<ContractMigration>,
     pub models: Vec<ClassMigration>,
 }
@@ -101,6 +102,7 @@ where
     // else we need to evaluate which contracts need to be migrated.
     let mut world = evaluate_contract_to_migrate(&diff.world, &artifact_paths, false)?;
     let base = evaluate_class_to_migrate(&diff.base, &artifact_paths, world.is_some())?;
+    let resource_metadata = evaluate_class_to_migrate(&diff.resource_metadata, &artifact_paths, world.is_some())?;
     let contracts =
         evaluate_contracts_to_migrate(&diff.contracts, &artifact_paths, world.is_some())?;
     let models = evaluate_models_to_migrate(&diff.models, &artifact_paths, world.is_some())?;
@@ -119,7 +121,7 @@ where
         );
     }
 
-    Ok(MigrationStrategy { world_address, world, base, contracts, models })
+    Ok(MigrationStrategy { world_address, world, resource_metadata, base, contracts, models })
 }
 
 fn evaluate_models_to_migrate(

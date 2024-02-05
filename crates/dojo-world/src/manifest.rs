@@ -21,6 +21,7 @@ use thiserror::Error;
 
 use crate::contracts::model::ModelError;
 use crate::contracts::WorldContractReader;
+use crate::contracts::world::WorldEvent;
 
 #[cfg(test)]
 #[path = "manifest_test.rs"]
@@ -28,6 +29,8 @@ mod test;
 
 pub const WORLD_CONTRACT_NAME: &str = "dojo::world::world";
 pub const BASE_CONTRACT_NAME: &str = "dojo::base::base";
+pub const RESOURCE_METADATA_CONTRACT_NAME: &str = "dojo::resource_metadata::resource_metadata";
+pub const RESOURCE_METADATA_MODEL_NAME: &str = "0x5265736f757263654d65746164617461";
 
 #[derive(Error, Debug)]
 pub enum ManifestError {
@@ -128,6 +131,7 @@ pub struct Class {
 pub struct Manifest {
     pub world: Contract,
     pub base: Class,
+    pub resource_metadata: Class,
     pub contracts: Vec<Contract>,
     pub models: Vec<Model>,
 }
@@ -171,6 +175,7 @@ impl Manifest {
         let world = WorldContractReader::new(world_address, provider);
 
         let base_class_hash = world.base().block_id(BLOCK_ID).call().await?;
+        let (resource_metadata_class_hash, _) = world.model(&FieldElement::from_hex_be(RESOURCE_METADATA_MODEL_NAME).unwrap()).block_id(BLOCK_ID).call().await?;
 
         let (models, contracts) =
             get_remote_models_and_contracts(world_address, &world.provider()).await?;
@@ -182,6 +187,11 @@ impl Manifest {
                 name: WORLD_CONTRACT_NAME.into(),
                 class_hash: world_class_hash,
                 address: Some(world_address),
+                ..Default::default()
+            },
+            resource_metadata: Class {
+                name: RESOURCE_METADATA_CONTRACT_NAME.into(),
+                class_hash: resource_metadata_class_hash.into(),
                 ..Default::default()
             },
             base: Class {
@@ -359,22 +369,21 @@ fn parse_contracts_events(
 fn parse_models_events(events: Vec<EmittedEvent>) -> Vec<Model> {
     let mut models: HashMap<String, FieldElement> = HashMap::with_capacity(events.len());
 
-    for event in events {
-        let mut data = event.data.into_iter();
+    for e in events {
+        let model_event = if let WorldEvent::ModelRegistered(m) = e.try_into().expect("ModelRegistered event is expected to be parseable") {
+            m
+        } else {
+            panic!("ModelRegistered expected");
+        };
 
-        let model_name = data.next().expect("name is missing from event");
-        let model_name = parse_cairo_short_string(&model_name).unwrap();
-
-        let class_hash = data.next().expect("class hash is missing from event");
-        let address = data.next().expect("address is missing from event");
-        let prev_address = data.next().expect("prev address hash is missing from event");
+        let model_name = parse_cairo_short_string(&model_event.name).unwrap();
 
         if let Some(current_class_hash) = models.get_mut(&model_name) {
-            if current_class_hash == &prev_class_hash {
-                *current_class_hash = class_hash;
+            if current_class_hash == &model_event.prev_class_hash.into() {
+                *current_class_hash = model_event.class_hash.into();
             }
         } else {
-            models.insert(model_name, class_hash);
+            models.insert(model_name, model_event.class_hash.into());
         }
     }
 

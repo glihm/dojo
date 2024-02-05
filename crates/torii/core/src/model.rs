@@ -15,6 +15,8 @@ use crate::error::{ParseError, QueryError};
 pub struct ModelSQLReader {
     /// The name of the model
     name: String,
+    /// The class hash of the model
+    class_hash: FieldElement,
     /// The contract address of the model
     contract_address: FieldElement,
     pool: Pool<Sqlite>,
@@ -25,19 +27,22 @@ pub struct ModelSQLReader {
 
 impl ModelSQLReader {
     pub async fn new(name: &str, pool: Pool<Sqlite>) -> Result<Self, Error> {
-        let (name, contract_address, packed_size, unpacked_size, layout): (
+        let (name, class_hash, contract_address, packed_size, unpacked_size, layout): (
+            String,
             String,
             String,
             u32,
             u32,
             String,
         ) = sqlx::query_as(
-            "SELECT name, contract_address, packed_size, unpacked_size, layout FROM models WHERE id = ?",
+            "SELECT name, class_hash, contract_address, packed_size, unpacked_size, layout FROM models WHERE id = ?",
         )
         .bind(name)
         .fetch_one(&pool)
         .await?;
 
+        let class_hash =
+            FieldElement::from_hex_be(&class_hash).map_err(error::ParseError::FromStr)?;
         let contract_address =
             FieldElement::from_hex_be(&contract_address).map_err(error::ParseError::FromStr)?;
         let packed_size = FieldElement::from(packed_size);
@@ -46,13 +51,17 @@ impl ModelSQLReader {
         let layout = hex::decode(layout).unwrap();
         let layout = layout.iter().map(|e| FieldElement::from(*e)).collect();
 
-        Ok(Self { name, contract_address, pool, packed_size, unpacked_size, layout })
+        Ok(Self { name, class_hash, contract_address, pool, packed_size, unpacked_size, layout })
     }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl ModelReader<Error> for ModelSQLReader {
+    fn class_hash(&self) -> FieldElement {
+        self.class_hash
+    }
+
     fn contract_address(&self) -> FieldElement {
         self.contract_address
     }

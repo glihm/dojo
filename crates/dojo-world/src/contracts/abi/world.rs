@@ -101,7 +101,7 @@ abigen!(
         ],
         "outputs": [
           {
-            "type": "core::starknet::contract_address::ContractAddress"
+            "type": "(core::starknet::class_hash::ClassHash, core::starknet::contract_address::ContractAddress)"
           }
         ],
         "state_mutability": "view"
@@ -500,6 +500,11 @@ abigen!(
       },
       {
         "name": "class_hash",
+        "type": "core::starknet::class_hash::ClassHash",
+        "kind": "data"
+      },
+      {
+        "name": "prev_class_hash",
         "type": "core::starknet::class_hash::ClassHash",
         "kind": "data"
       },

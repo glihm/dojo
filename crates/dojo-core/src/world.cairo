@@ -7,7 +7,7 @@ use dojo::resource_metadata::{ResourceMetadata, RESOURCE_METADATA_MODEL};
 trait IWorld<T> {
     fn metadata(self: @T, resource_id: felt252) -> ResourceMetadata;
     fn set_metadata(ref self: T, metadata: ResourceMetadata);
-    fn model(self: @T, name: felt252) -> ContractAddress;
+    fn model(self: @T, name: felt252) -> (ClassHash, ContractAddress);
     fn register_model(ref self: T, class_hash: ClassHash);
     fn deploy_contract(ref self: T, salt: felt252, class_hash: ClassHash) -> ContractAddress;
     fn upgrade_contract(ref self: T, address: ContractAddress, class_hash: ClassHash) -> ClassHash;
@@ -122,6 +122,7 @@ mod world {
     struct ModelRegistered {
         name: felt252,
         class_hash: ClassHash,
+        prev_class_hash: ClassHash,
         address: ContractAddress,
         prev_address: ContractAddress,
     }
@@ -159,7 +160,7 @@ mod world {
         nonce: usize,
         models_count: usize,
         metadata_uri: LegacyMap::<felt252, felt252>,
-        models: LegacyMap::<felt252, ContractAddress>,
+        models: LegacyMap::<felt252, (ClassHash, ContractAddress)>,
         deployed_contracts: LegacyMap::<felt252, ClassHash>,
         owners: LegacyMap::<(felt252, ContractAddress), bool>,
         writers: LegacyMap::<(felt252, ContractAddress), bool>,
@@ -205,7 +206,7 @@ mod world {
         /// `metadata` - The metadata content for this resource.
         fn set_metadata(ref self: ContractState, metadata: ResourceMetadata) {
             assert_can_write(@self, metadata.resource_id, get_caller_address());
-
+            assert(metadata.metadata_uri.len() == 3, 'bad len');
             self
                 .set_entity(
                     Model::<ResourceMetadata>::name(@metadata),
@@ -325,7 +326,10 @@ mod world {
             let (address, name) = dojo::model::deploy_and_get_name(salt.into(), class_hash).unwrap_syscall();
             self.models_count.write(salt + 1);
 
-            let mut prev_address = starknet::contract_address::ContractAddressZeroable::zero();
+            let (mut prev_class_hash, mut prev_address) = (
+                starknet::class_hash::ClassHashZeroable::zero(),
+                starknet::contract_address::ContractAddressZeroable::zero(),
+            );
 
             // Avoids a model name to conflict with already deployed contract,
             // which can cause ACL issue with current ACL implementation.
@@ -334,16 +338,17 @@ mod world {
             }
 
             // If model is already registered, validate permission to update.
-            let current_address = self.models.read(name);
-            if current_address.is_non_zero() {
+            let (current_class_hash, current_address) = self.models.read(name);
+            if current_class_hash.is_non_zero() {
                 assert(self.is_owner(caller, name), 'only owner can update');
+                prev_class_hash = current_class_hash;
                 prev_address = current_address;
             } else {
                 self.owners.write((name, caller), true);
             };
 
-            self.models.write(name, address);
-            EventEmitter::emit(ref self, ModelRegistered { name, prev_address, address, class_hash });
+            self.models.write(name, (class_hash, address));
+            EventEmitter::emit(ref self, ModelRegistered { name, prev_address, address, class_hash, prev_class_hash });
         }
 
         /// Gets the class hash of a registered model.
@@ -355,7 +360,7 @@ mod world {
         /// # Returns
         ///
         /// * `ContractAddress` - The contract address of the model.
-        fn model(self: @ContractState, name: felt252) -> ContractAddress {
+        fn model(self: @ContractState, name: felt252) -> (ClassHash, ContractAddress) {
             self.models.read(name)
         }
 
@@ -449,6 +454,8 @@ mod world {
         ) {
             assert_can_write(@self, model, get_caller_address());
 
+            assert(values.len() == 4, 'bbbbbad values');
+            assert(layout.len() == 4, 'bbbbbad layout');
             let key = poseidon::poseidon_hash_span(keys);
             database::set(model, key, values, layout);
 
