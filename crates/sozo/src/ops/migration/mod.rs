@@ -284,30 +284,6 @@ where
 {
     let ui = ws.config().ui();
 
-    match &strategy.executor {
-        Some(executor) => {
-            ui.print_header("# Executor");
-            deploy_contract(executor, "executor", vec![], migrator, &ui, &txn_config).await?;
-
-            // There is no world migration, so it exists already.
-            if strategy.world.is_none() {
-                let addr = strategy.world_address()?;
-                let InvokeTransactionResult { transaction_hash } =
-                    WorldContract::new(addr, &migrator)
-                        .set_executor(&executor.contract_address.into())
-                        .send()
-                        .await?;
-
-                TransactionWaiter::new(transaction_hash, migrator.provider()).await?;
-
-                ui.print_hidden_sub(format!("Updated at: {transaction_hash:#x}"));
-            }
-
-            ui.print_sub(format!("Contract address: {:#x}", executor.contract_address));
-        }
-        None => {}
-    };
-
     match &strategy.base {
         Some(base) => {
             ui.print_header("# Base Contract");
@@ -333,7 +309,6 @@ where
             ui.print_header("# World");
 
             let calldata = vec![
-                strategy.executor.as_ref().unwrap().contract_address,
                 strategy.base.as_ref().unwrap().diff.local,
             ];
             deploy_contract(world, "world", calldata.clone(), migrator, &ui, &txn_config)

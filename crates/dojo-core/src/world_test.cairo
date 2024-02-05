@@ -171,8 +171,9 @@ fn test_model_class_hash_getter() {
     let world = deploy_world();
     world.register_model(foo::TEST_CLASS_HASH.try_into().unwrap());
 
-    let foo = world.model('Foo');
-    assert(foo == foo::TEST_CLASS_HASH.try_into().unwrap(), 'foo does not exists');
+    let foo_address = world.model('Foo');
+    let foo_address_expected: ContractAddress = 0x3.try_into().unwrap();
+    assert(foo_address == foo_address_expected, 'foo does not exists');
 }
 
 #[test]

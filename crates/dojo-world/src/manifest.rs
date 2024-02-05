@@ -27,15 +27,12 @@ use crate::contracts::WorldContractReader;
 mod test;
 
 pub const WORLD_CONTRACT_NAME: &str = "dojo::world::world";
-pub const EXECUTOR_CONTRACT_NAME: &str = "dojo::executor::executor";
 pub const BASE_CONTRACT_NAME: &str = "dojo::base::base";
 
 #[derive(Error, Debug)]
 pub enum ManifestError {
     #[error("Remote World not found.")]
     RemoteWorldNotFound,
-    #[error("Executor contract not found.")]
-    ExecutorNotFound,
     #[error("Entry point name contains non-ASCII characters.")]
     InvalidEntryPointError,
     #[error(transparent)]
@@ -130,7 +127,6 @@ pub struct Class {
 #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Manifest {
     pub world: Contract,
-    pub executor: Contract,
     pub base: Class,
     pub contracts: Vec<Contract>,
     pub models: Vec<Model>,
@@ -174,19 +170,7 @@ impl Manifest {
 
         let world = WorldContractReader::new(world_address, provider);
 
-        let executor_address = world.executor().block_id(BLOCK_ID).call().await?;
         let base_class_hash = world.base().block_id(BLOCK_ID).call().await?;
-
-        let executor_class_hash = world
-            .provider()
-            .get_class_hash_at(BLOCK_ID, FieldElement::from(executor_address))
-            .await
-            .map_err(|err| match err {
-                ProviderError::StarknetError(StarknetError::ContractNotFound) => {
-                    ManifestError::ExecutorNotFound
-                }
-                err => err.into(),
-            })?;
 
         let (models, contracts) =
             get_remote_models_and_contracts(world_address, &world.provider()).await?;
@@ -198,12 +182,6 @@ impl Manifest {
                 name: WORLD_CONTRACT_NAME.into(),
                 class_hash: world_class_hash,
                 address: Some(world_address),
-                ..Default::default()
-            },
-            executor: Contract {
-                name: EXECUTOR_CONTRACT_NAME.into(),
-                address: Some(executor_address.into()),
-                class_hash: executor_class_hash,
                 ..Default::default()
             },
             base: Class {
@@ -388,7 +366,8 @@ fn parse_models_events(events: Vec<EmittedEvent>) -> Vec<Model> {
         let model_name = parse_cairo_short_string(&model_name).unwrap();
 
         let class_hash = data.next().expect("class hash is missing from event");
-        let prev_class_hash = data.next().expect("prev class hash is missing from event");
+        let address = data.next().expect("address is missing from event");
+        let prev_address = data.next().expect("prev address hash is missing from event");
 
         if let Some(current_class_hash) = models.get_mut(&model_name) {
             if current_class_hash == &prev_class_hash {

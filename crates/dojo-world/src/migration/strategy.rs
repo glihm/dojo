@@ -15,7 +15,6 @@ use super::{DeployOutput, MigrationType, RegisterOutput};
 #[derive(Debug)]
 pub struct MigrationOutput {
     pub world: Option<DeployOutput>,
-    pub executor: Option<DeployOutput>,
     pub contracts: Vec<DeployOutput>,
     pub models: Option<RegisterOutput>,
 }
@@ -24,7 +23,6 @@ pub struct MigrationOutput {
 pub struct MigrationStrategy {
     pub world_address: Option<FieldElement>,
     pub world: Option<ContractMigration>,
-    pub executor: Option<ContractMigration>,
     pub base: Option<ClassMigration>,
     pub contracts: Vec<ContractMigration>,
     pub models: Vec<ClassMigration>,
@@ -49,13 +47,6 @@ impl MigrationStrategy {
         let mut update = 0;
 
         if let Some(item) = &self.world {
-            match item.migration_type() {
-                MigrationType::New => new += 1,
-                MigrationType::Update => update += 1,
-            }
-        }
-
-        if let Some(item) = &self.executor {
             match item.migration_type() {
                 MigrationType::New => new += 1,
                 MigrationType::Update => update += 1,
@@ -109,17 +100,10 @@ where
     // If the world contract needs to be migrated, then all contracts need to be migrated
     // else we need to evaluate which contracts need to be migrated.
     let mut world = evaluate_contract_to_migrate(&diff.world, &artifact_paths, false)?;
-    let mut executor =
-        evaluate_contract_to_migrate(&diff.executor, &artifact_paths, world.is_some())?;
     let base = evaluate_class_to_migrate(&diff.base, &artifact_paths, world.is_some())?;
     let contracts =
         evaluate_contracts_to_migrate(&diff.contracts, &artifact_paths, world.is_some())?;
     let models = evaluate_models_to_migrate(&diff.models, &artifact_paths, world.is_some())?;
-
-    if let Some(executor) = &mut executor {
-        executor.contract_address =
-            get_contract_address(FieldElement::ZERO, diff.executor.local, &[], FieldElement::ZERO);
-    }
 
     // If world needs to be migrated, then we expect the `seed` to be provided.
     if let Some(world) = &mut world {
@@ -130,12 +114,12 @@ where
         world.contract_address = get_contract_address(
             salt,
             diff.world.local,
-            &[executor.as_ref().unwrap().contract_address, base.as_ref().unwrap().diff.local],
+            &[base.as_ref().unwrap().diff.local],
             FieldElement::ZERO,
         );
     }
 
-    Ok(MigrationStrategy { world_address, world, executor, base, contracts, models })
+    Ok(MigrationStrategy { world_address, world, base, contracts, models })
 }
 
 fn evaluate_models_to_migrate(
