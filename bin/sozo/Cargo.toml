@@ -24,6 +24,7 @@ clap-verbosity-flag = "2.0.1"
 clap.workspace = true
 clap_complete.workspace = true
 console.workspace = true
+convert_case.workspace = true
 dojo-bindgen.workspace = true
 dojo-lang.workspace = true
 dojo-types.workspace = true

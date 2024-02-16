@@ -132,8 +132,17 @@ where
         return Ok((new_manifest, world_address));
     }
 
-    match migration::apply_diff(ws, target_dir, diff, name.clone(), world_address, account, None)
-        .await
+    match migration::apply_diff(
+        ws,
+        target_dir,
+        diff,
+        name.clone(),
+        world_address,
+        account,
+        None,
+        false,
+    )
+    .await
     {
         Ok(address) => {
             config

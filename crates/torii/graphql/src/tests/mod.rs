@@ -275,7 +275,7 @@ pub async fn spinup_types_test() -> Result<SqlitePool> {
     let ws = ops::read_workspace(config.manifest_path(), &config)
         .unwrap_or_else(|op| panic!("Error building workspace: {op:?}"));
 
-    execute_strategy(&ws, &migration, &account, None).await.unwrap();
+    execute_strategy(&ws, &migration, &account, None, false).await.unwrap();
 
     let manifest =
         Manifest::load_from_remote(&provider, migration.world_address().unwrap()).await.unwrap();

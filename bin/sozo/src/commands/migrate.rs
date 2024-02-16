@@ -17,6 +17,14 @@ pub struct MigrateArgs {
     pub dry_run: bool,
 
     #[arg(long)]
+    #[arg(help = "Use model contract name instead of it's full path.")]
+    pub use_model_short_name: bool,
+
+    #[arg(long)]
+    #[arg(help = "Use the remote base class hash instead of the local base class hash.")]
+    pub use_remote_base: bool,
+
+    #[arg(long)]
     #[arg(help = "Name of the World.")]
     #[arg(long_help = "Name of the World. It's hash will be used as a salt when deploying the \
                        contract to avoid address conflicts.")]

@@ -33,7 +33,7 @@ async fn migrate_with_auto_mine() {
     let mut account = sequencer.account();
     account.set_block_id(BlockId::Tag(BlockTag::Pending));
 
-    execute_strategy(&ws, &migration, &account, None).await.unwrap();
+    execute_strategy(&ws, &migration, &account, None, false).await.unwrap();
 
     sequencer.stop().unwrap();
 }
@@ -55,7 +55,7 @@ async fn migrate_with_block_time() {
     let mut account = sequencer.account();
     account.set_block_id(BlockId::Tag(BlockTag::Pending));
 
-    execute_strategy(&ws, &migration, &account, None).await.unwrap();
+    execute_strategy(&ws, &migration, &account, None, false).await.unwrap();
     sequencer.stop().unwrap();
 }
 
@@ -89,6 +89,7 @@ async fn migrate_with_small_fee_multiplier_will_fail() {
             &migration,
             &account,
             Some(TransactionOptions { fee_estimate_multiplier: Some(0.2f64), wait: false }),
+            false,
         )
         .await
         .is_err()
@@ -134,7 +135,7 @@ async fn migration_from_remote() {
     let migration =
         prepare_for_migration(None, Some(felt!("0x12345")), target_dir.clone(), world).unwrap();
 
-    execute_strategy(&ws, &migration, &account, None).await.unwrap();
+    execute_strategy(&ws, &migration, &account, None, false).await.unwrap();
 
     let local_manifest = Manifest::load_from_path(target_dir.join("manifest.json")).unwrap();
     let remote_manifest = Manifest::load_from_remote(

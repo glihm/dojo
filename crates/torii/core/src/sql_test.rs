@@ -36,7 +36,7 @@ where
     let config = build_test_config("../../../examples/spawn-and-move/Scarb.toml").unwrap();
     let ws = ops::read_workspace(config.manifest_path(), &config)
         .unwrap_or_else(|op| panic!("Error building workspace: {op:?}"));
-    execute_strategy(&ws, &migration, &account, None).await.unwrap();
+    execute_strategy(&ws, &migration, &account, None, false).await.unwrap();
 
     let (shutdown_tx, _) = broadcast::channel(1);
     let mut engine = Engine::new(

@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::{anyhow, bail, Context, Result};
+use convert_case::{Case, Casing};
 use dojo_world::contracts::abi::world::ResourceMetadata;
 use dojo_world::contracts::cairo_utils;
 use dojo_world::contracts::world::WorldContract;
@@ -73,11 +74,20 @@ where
             world_address,
             &account,
             Some(args.transaction),
+            args.use_remote_base,
         )
         .await?;
 
-        update_world_manifest(ws, local_manifest, remote_manifest, target_dir, world_address)
-            .await?;
+        update_world_manifest(
+            ws,
+            local_manifest,
+            remote_manifest,
+            target_dir,
+            world_address,
+            args.use_model_short_name,
+            args.use_remote_base,
+        )
+        .await?;
     }
 
     Ok(())
@@ -89,6 +99,8 @@ async fn update_world_manifest<U>(
     remote_manifest: Option<Manifest>,
     target_dir: U,
     world_address: FieldElement,
+    use_remote_base: bool,
+    use_model_short_name: bool,
 ) -> Result<()>
 where
     U: AsRef<Path>,
@@ -99,11 +111,31 @@ where
 
     let base_class_hash = match remote_manifest {
         Some(manifest) => manifest.base.class_hash,
-        None => local_manifest.base.class_hash,
+        None => {
+            if use_remote_base {
+                bail!(
+                    "No base contract found in remote manifest. Do not use --use-remote-base to \
+                     ensure a new base contract is deployed."
+                );
+            }
+
+            local_manifest.base.class_hash
+        }
     };
 
     local_manifest.contracts.iter_mut().for_each(|c| {
-        let salt = generate_salt(&c.name);
+        let model_name = if use_model_short_name {
+            c.name
+                .split("::")
+                .last()
+                .unwrap_or(&c.name)
+                .from_case(Case::Snake)
+                .to_case(Case::Pascal)
+        } else {
+            c.name.to_string()
+        };
+
+        let salt = generate_salt(&model_name);
         c.address = Some(get_contract_address(salt, base_class_hash, &[], world_address));
     });
 
@@ -122,6 +154,7 @@ pub(crate) async fn apply_diff<U, P, S>(
     world_address: Option<FieldElement>,
     account: &SingleOwnerAccount<P, S>,
     txn_config: Option<TransactionOptions>,
+    use_remote_base: bool,
 ) -> Result<FieldElement>
 where
     U: AsRef<Path>,
@@ -133,7 +166,7 @@ where
 
     println!("  ");
 
-    let block_height = execute_strategy(ws, &strategy, account, txn_config)
+    let block_height = execute_strategy(ws, &strategy, account, txn_config, use_remote_base)
         .await
         .map_err(|e| anyhow!(e))
         .with_context(|| "Problem trying to migrate.")?;
@@ -280,6 +313,7 @@ pub async fn execute_strategy<P, S>(
     strategy: &MigrationStrategy,
     migrator: &SingleOwnerAccount<P, S>,
     txn_config: Option<TransactionOptions>,
+    use_remote_base: bool,
 ) -> Result<Option<u64>>
 where
     P: Provider + Sync + Send + 'static,
@@ -290,6 +324,11 @@ where
     match &strategy.base {
         Some(base) => {
             ui.print_header("# Base Contract");
+
+            if use_remote_base {
+                ui.print_sub("Skipping base contract to use already deployed contract.");
+                return Ok(None);
+            }
 
             match base
                 .declare(migrator, txn_config.clone().map(|c| c.into()).unwrap_or_default())

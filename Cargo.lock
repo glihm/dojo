@@ -10980,6 +10980,7 @@ dependencies = [
  "clap-verbosity-flag",
  "clap_complete",
  "console",
+ "convert_case 0.6.0",
  "dojo-bindgen",
  "dojo-lang",
  "dojo-test-utils",
