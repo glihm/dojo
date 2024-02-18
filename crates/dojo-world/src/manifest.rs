@@ -383,12 +383,15 @@ fn parse_models_events(events: Vec<EmittedEvent>) -> Vec<Model> {
     let mut models: HashMap<String, FieldElement> = HashMap::with_capacity(events.len());
 
     for e in events {
-        let model_event = if let WorldEvent::ModelRegistered(m) =
-            e.try_into().expect("ModelRegistered event is expected to be parseable")
+        let model_event = if let Ok(WorldEvent::ModelRegistered(m)) = e.try_into()
         {
             m
         } else {
-            panic!("ModelRegistered expected");
+            // As models were registered with the new event type, we can
+            // skip old ones. We are sure at least 1 new event was emitted
+            // when models were migrated.
+
+            continue;
         };
 
         let model_name = parse_cairo_short_string(&model_event.name).unwrap();
@@ -402,7 +405,7 @@ fn parse_models_events(events: Vec<EmittedEvent>) -> Vec<Model> {
         }
     }
 
-    // TODO: include address of the model in the manifest.
+    // Only the class hash is used to evaluate changes, may be included though.
     models
         .into_iter()
         .map(|(name, class_hash)| Model { name, class_hash, ..Default::default() })
