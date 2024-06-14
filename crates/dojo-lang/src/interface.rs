@@ -18,6 +18,16 @@ impl DojoInterface {
         let mut system = DojoInterface { diagnostics: vec![] };
         let mut builder = PatchBuilder::new(db, &trait_ast);
 
+        let trait_path = trait_ast.generic_params(db).as_syntax_node().get_text(db);
+
+        if !trait_path.is_empty() {
+            system.diagnostics.push(PluginDiagnostic {
+                stable_ptr: trait_ast.stable_ptr().untyped(),
+                message: "Dojo interfaces cannot have generic parameters.".to_string(),
+                severity: Severity::Error,
+            });
+        }
+
         if let ast::MaybeTraitBody::Some(body) = trait_ast.body(db) {
             let body_nodes: Vec<_> = body
                 .items(db)
