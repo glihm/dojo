@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cairo_lang_defs::patcher::RewriteNode;
 use cairo_lang_defs::plugin::PluginDiagnostic;
 use cairo_lang_diagnostics::Severity;
-use cairo_lang_syntax::node::ast::{ArgClause, Expr, ItemStruct, OptionArgListParenthesized};
+use cairo_lang_syntax::node::ast::{ArgClause, Expr, ItemStruct, Member as MemberAst,OptionArgListParenthesized};
 use cairo_lang_syntax::node::db::SyntaxGroup;
 use cairo_lang_syntax::node::helpers::QueryAttrs;
 use cairo_lang_syntax::node::{Terminal, TypedStablePtr, TypedSyntaxNode};
@@ -233,19 +233,33 @@ pub fn handle_model_struct(
         ),
     };
 
+    let mut members: Vec<Member> = vec![];
+    let mut members_values: Vec<RewriteNode> = vec![];
+    let mut serialized_keys: Vec<RewriteNode> = vec![];
+    let mut serialized_values: Vec<RewriteNode> = vec![];
+
     let elements = struct_ast.members(db).elements(db);
-    let members: &Vec<_> = &elements
+    elements
         .iter()
-        .map(|member| Member {
-            name: member.name(db).text(db).to_string(),
-            ty: member.type_clause(db).ty(db).as_syntax_node().get_text(db).trim().to_string(),
-            key: member.has_attr(db, "key"),
-        })
-        .collect::<_>();
+        .for_each(|member_ast| {
+            let member = Member {
+                name: member_ast.name(db).text(db).to_string(),
+                ty: member_ast.type_clause(db).ty(db).as_syntax_node().get_text(db).trim().to_string(),
+                key: member_ast.has_attr(db, "key"),
+            };
 
-    let keys: Vec<_> = members.iter().filter(|m| m.key).collect::<_>();
+            if (&member).key {
+                validate_key_member(&member, db, member_ast, &mut diagnostics);
+                serialized_keys.push(serialize_member_ty(&member));
+            } else {
+                serialized_values.push(serialize_member_ty(&member));
+                members_values.push(RewriteNode::Text(format!("{}: {},\n", member.name, member.ty)));
+            }
 
-    if keys.is_empty() {
+            members.push(member);
+        });
+
+    if serialized_keys.is_empty() {
         diagnostics.push(PluginDiagnostic {
             message: "Model must define at least one #[key] attribute".into(),
             stable_ptr: struct_ast.name(db).stable_ptr().untyped(),
@@ -253,7 +267,7 @@ pub fn handle_model_struct(
         });
     }
 
-    if keys.len() == members.len() {
+    if serialized_values.is_empty() {
         diagnostics.push(PluginDiagnostic {
             message: "Model must define at least one member that is not a key".into(),
             stable_ptr: struct_ast.name(db).stable_ptr().untyped(),
@@ -261,52 +275,62 @@ pub fn handle_model_struct(
         });
     }
 
-    for k in &keys {
-        if k.ty == "u256" {
-            diagnostics.push(PluginDiagnostic {
-                message: "Key is only supported for core types that are 1 felt long once \
-                          serialized. `u256` is a struct of 2 u128, hence not supported."
-                    .into(),
-                stable_ptr: struct_ast.name(db).stable_ptr().untyped(),
-                severity: Severity::Error,
-            });
-        }
-    }
-
-    let serialize_member = |m: &Member, include_key: bool| {
-        if m.key && !include_key {
-            return None;
-        }
-
-        if m.ty == "felt252" {
-            return Some(RewriteNode::Text(format!(
-                "core::array::ArrayTrait::append(ref serialized, *self.{});",
-                m.name
-            )));
-        }
-
-        Some(RewriteNode::Text(format!(
-            "core::serde::Serde::serialize(self.{}, ref serialized);",
-            m.name
-        )))
-    };
-
-    let serialized_keys: Vec<_> =
-        keys.iter().filter_map(|m| serialize_member(m, true)).collect::<_>();
-
-    let serialized_values: Vec<_> =
-        members.iter().filter_map(|m| serialize_member(m, false)).collect::<_>();
-
     let name = struct_ast.name(db).text(db);
     aux_data.models.push(Model {
         name: name.to_string(),
         namespace: model_namespace.clone(),
-        members: members.to_vec(),
+        members,
     });
 
     (
         RewriteNode::interpolate_patched(
             "
+#[derive(Drop, Serde)]
+pub struct $type_name$Values {
+    $members_values$
+}
+
+impl $type_name$ModelValues of dojo::model::ModelValues<$type_name$Values> {
+    fn entity_by_id(world: dojo::world::IWorldDispatcher, id: felt252) -> $type_name$Values {
+        let mut values = dojo::world::IWorldDispatcherTrait::entity_by_id(
+            world,
+            dojo::model::Model::<$type_name$>::selector(),
+            id,
+            dojo::model::Model::<$type_name$>::layout()
+        );
+
+        let entity_values = core::serde::Serde::<$type_name$Values>::deserialize(ref values);
+
+        if core::option::OptionTrait::<$type_name$Values>::is_none(@entity_values) {
+            panic!(
+                \"Model `$type_name$Values`: deserialization failed.\"
+            );
+        }
+
+        core::option::OptionTrait::<$type_name$Values>::unwrap(entity_values)
+    }
+
+    #[inline(always)]
+    fn values(self: @$type_name$Values) -> Span<felt252> {
+        let mut serialized = core::array::ArrayTrait::new();
+        $serialized_values$
+        core::array::ArrayTrait::span(@serialized)
+    }
+
+    #[inline(always)]
+    fn set(
+        self: @$type_name$Values, world: dojo::world::IWorldDispatcher, id: felt252
+    ) {
+        dojo::world::IWorldDispatcherTrait::set_entity_by_id(
+            world,
+            dojo::model::Model::<$type_name$>::selector(),
+            id,
+            Self::values(self),
+            dojo::model::Model::<$type_name$>::layout(),
+        );
+    }
+}
+
 impl $type_name$Model of dojo::model::Model<$type_name$> {
     fn entity(world: dojo::world::IWorldDispatcher, keys: Span<felt252>, layout: \
              dojo::database::introspect::Layout) -> $type_name$ {
@@ -434,7 +458,7 @@ mod $contract_name$ {
         fn version(self: @ContractState) -> u8 {
            dojo::model::Model::<$type_name$>::version()
         }
-        
+
         fn namespace(self: @ContractState) -> ByteArray {
            dojo::model::Model::<$type_name$>::namespace()
         }
@@ -442,7 +466,7 @@ mod $contract_name$ {
         fn namespace_selector(self: @ContractState) -> felt252 {
             dojo::model::Model::<$type_name$>::namespace_selector()
         }
-        
+
         fn unpacked_size(self: @ContractState) -> Option<usize> {
             dojo::database::introspect::Introspect::<$type_name$>::size()
         }
@@ -480,8 +504,45 @@ mod $contract_name$ {
                     "model_namespace_hash".to_string(),
                     RewriteNode::Text(model_namespace_hash.to_string()),
                 ),
+                ("members_values".to_string(), RewriteNode::new_modified(members_values)),
             ]),
         ),
         diagnostics,
     )
+}
+
+/// Validates that the key member is valid.
+///
+/// # Arguments
+///
+/// * member: The member to validate.
+/// * diagnostics: The diagnostics to push to, if the member is an invalid key.
+fn validate_key_member(member: &Member, db: &dyn SyntaxGroup, member_ast: &MemberAst, diagnostics: &mut Vec<PluginDiagnostic>) {
+    if member.ty == "u256" {
+        diagnostics.push(PluginDiagnostic {
+            message: "Key is only supported for core types that are 1 felt long once \
+                      serialized. `u256` is a struct of 2 u128, hence not supported."
+                .into(),
+            stable_ptr: member_ast.name(db).stable_ptr().untyped(),
+            severity: Severity::Error,
+        });
+    }
+}
+
+/// Creates a [`RewriteNode`] for the member type serialization.
+///
+/// # Arguments
+///
+/// * member: The member to serialize.
+fn serialize_member_ty(member: &Member) -> RewriteNode {
+    match member.ty.as_str() {
+        "felt252" => RewriteNode::Text(format!(
+            "core::array::ArrayTrait::append(ref serialized, *self.{});",
+            member.name
+        )),
+        _ => RewriteNode::Text(format!(
+            "core::serde::Serde::serialize(self.{}, ref serialized);",
+            member.name
+        )),
+    }
 }

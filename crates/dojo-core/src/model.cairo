@@ -1,6 +1,31 @@
 use dojo::world::IWorldDispatcher;
 use starknet::SyscallResult;
 
+/// Computes the entity id from the keys.
+///
+/// # Arguments
+///
+/// * `keys` - The keys of the entity.
+///
+/// # Returns
+///
+/// The entity id.
+pub fn entity_id_from_keys(keys: Span<felt252>) -> felt252 {
+    poseidon::poseidon_hash_span(keys)
+}
+
+/// Trait that is implemented at Cairo level for each struct that is a model.
+trait ModelValues<T> {
+    fn values(self: @T) -> Span<felt252>;
+
+    fn get_by_id(
+        world: IWorldDispatcher, id: felt252
+    ) -> T;
+
+    fn set(self: @T, world: IWorldDispatcher, id: felt252);
+}
+
+/// Trait that is implemented at Cairo level for each struct that is a model.
 trait Model<T> {
     fn entity(
         world: IWorldDispatcher, keys: Span<felt252>, layout: dojo::database::introspect::Layout
@@ -17,7 +42,7 @@ trait Model<T> {
 
     /// Returns the namespace of the model as it was written in the `dojo::model` attribute.
     /// only lower case characters (a-z) and underscore (_) are allowed.
-    fn namespace() -> ByteArray;
+    fn namespace() -> ByteArray
 
     /// Returns the model namespace selector built from its namespace.
     /// namespace_selector = hash(namespace_name)
@@ -30,6 +55,7 @@ trait Model<T> {
     fn packed_size() -> Option<usize>;
 }
 
+/// Interface implemented by the contract that is derived from the model.
 #[starknet::interface]
 trait IModel<T> {
     fn selector(self: @T) -> felt252;

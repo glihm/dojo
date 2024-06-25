@@ -19,10 +19,20 @@ trait IWorld<T> {
     fn entity(
         self: @T, model: felt252, keys: Span<felt252>, layout: dojo::database::introspect::Layout
     ) -> Span<felt252>;
+    fn entity_by_id(
+        self: @T, model: felt252, id: felt252, layout: dojo::database::introspect::Layout
+    ) -> Span<felt252>;
     fn set_entity(
         ref self: T,
         model: felt252,
         keys: Span<felt252>,
+        values: Span<felt252>,
+        layout: dojo::database::introspect::Layout
+    );
+    fn set_entity_by_id(
+        ref self: T,
+        model: felt252,
+        id: felt252,
         values: Span<felt252>,
         layout: dojo::database::introspect::Layout
     );
@@ -306,7 +316,7 @@ mod world {
             let mut data = self
                 ._read_model_data(
                     dojo::model::Model::<ResourceMetadata>::selector(),
-                    array![resource_id].span(),
+                    poseidon::poseidon_hash_span(array![resource_id].span()),
                     Model::<ResourceMetadata>::layout()
                 );
 
@@ -330,11 +340,11 @@ mod world {
             );
 
             let model = Model::<ResourceMetadata>::selector();
-            let keys = Model::<ResourceMetadata>::keys(@metadata);
+            let id = poseidon::poseidon_hash_span(Model::<ResourceMetadata>::keys(@metadata));
             let values = Model::<ResourceMetadata>::values(@metadata);
             let layout = Model::<ResourceMetadata>::layout();
 
-            self._write_model_data(model, keys, values, layout);
+            self._write_model_data(model, id, values, layout);
 
             EventEmitter::emit(
                 ref self,
@@ -759,8 +769,25 @@ mod world {
                 self.can_write_model(model, get_caller_address()), Errors::NO_MODEL_WRITE_ACCESS
             );
 
-            self._write_model_data(model, keys, values, layout);
+            let id = poseidon::poseidon_hash_span(keys);
+            self._write_model_data(model, id, values, layout);
             EventEmitter::emit(ref self, StoreSetRecord { table: model, keys, values });
+        }
+
+        fn set_entity_by_id(
+            ref self: ContractState,
+            model: felt252,
+            id: felt252,
+            values: Span<felt252>,
+            layout: dojo::database::introspect::Layout
+        ) {
+            assert(
+                self.can_write_model(model, get_caller_address()), Errors::NO_MODEL_WRITE_ACCESS
+            );
+
+            self._write_model_data(model, id, values, layout);
+            // How Torii can handle a set without all the keys though?
+            //EventEmitter::emit(ref self, StoreSetRecord { table: model, keys, values });            
         }
 
         /// Deletes a model from an entity.
@@ -786,8 +813,8 @@ mod world {
             EventEmitter::emit(ref self, StoreDelRecord { table: model, keys });
         }
 
-        /// Gets the model value for an entity. Returns a zero initialized
-        /// model value if the entity has not been set.
+        /// Gets the model value for an entity. The returned span of values contains the keys.
+        /// Returns a zero initialized model value if the entity has not been set.
         ///
         /// # Arguments
         ///
@@ -805,7 +832,25 @@ mod world {
             keys: Span<felt252>,
             layout: dojo::database::introspect::Layout
         ) -> Span<felt252> {
-            self._read_model_data(model, keys, layout)
+            let id = poseidon::poseidon_hash_span(keys);
+            self._read_model_data(model, id, layout)
+        }
+
+        /// Gets the model value for an entity by id.
+        ///
+        /// # Arguments
+        ///
+        /// * `model` - The selector of the model to be retrieved.
+        /// * `id` - The id of the entity (hash of the keys).
+        /// * `layout` - The memory layout of the entity.
+        ///
+        /// # Returns
+        ///
+        /// * `Span<felt252>` - The serialized value of the model, zero initialized if not set.
+        fn entity_by_id(
+            self: @ContractState, model: felt252, id: felt252, layout: dojo::database::introspect::Layout
+        ) -> Span<felt252> {
+            self._read_model_data(model, id, layout)
         }
 
         /// Gets the base contract class hash.
@@ -1009,25 +1054,24 @@ mod world {
         ///
         /// # Arguments
         ///   * `model` - the model selector
-        ///   * `keys` - the list of model keys to identify the record
+        ///   * `id` - the id of the entity (hash of the keys of the model).
         ///   * `values` - the field values of the record
         ///   * `layout` - the model layout
         fn _write_model_data(
             ref self: ContractState,
             model: felt252,
-            keys: Span<felt252>,
+            id: felt252,
             values: Span<felt252>,
             layout: dojo::database::introspect::Layout
         ) {
-            let model_key = poseidon::poseidon_hash_span(keys);
             let mut offset = 0;
 
             match layout {
                 Layout::Fixed(layout) => {
-                    Self::_write_fixed_layout(model, model_key, values, ref offset, layout);
+                    Self::_write_fixed_layout(model, id, values, ref offset, layout);
                 },
                 Layout::Struct(layout) => {
-                    Self::_write_struct_layout(model, model_key, values, ref offset, layout);
+                    Self::_write_struct_layout(model, id, values, ref offset, layout);
                 },
                 _ => { panic!("Unexpected layout type for a model."); }
             };
@@ -1060,23 +1104,22 @@ mod world {
         ///
         /// # Arguments
         ///   * `model` - the model selector
-        ///   * `keys` - the list of model keys to identify the record
+        ///   * `id` - the id of the entity (hash of the keys of the model).
         ///   * `layout` - the model layout
         fn _read_model_data(
             self: @ContractState,
             model: felt252,
-            keys: Span<felt252>,
+            id: felt252,
             layout: dojo::database::introspect::Layout
         ) -> Span<felt252> {
-            let model_key = poseidon::poseidon_hash_span(keys);
             let mut read_data = ArrayTrait::<felt252>::new();
 
             match layout {
                 Layout::Fixed(layout) => {
-                    Self::_read_fixed_layout(model, model_key, ref read_data, layout);
+                    Self::_read_fixed_layout(model, id, ref read_data, layout);
                 },
                 Layout::Struct(layout) => {
-                    Self::_read_struct_layout(model, model_key, ref read_data, layout);
+                    Self::_read_struct_layout(model, id, ref read_data, layout);
                 },
                 _ => { panic!("Unexpected layout type for a model."); }
             };

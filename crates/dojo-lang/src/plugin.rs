@@ -534,6 +534,13 @@ impl MacroPlugin for BuiltinDojoPlugin {
 
                 let (code, code_mappings) = builder.build();
 
+                use std::fs::File;
+                use std::io::Write;
+
+                let file_path = format!("/tmp/{}", name);
+                let mut file = File::create(file_path).expect("Failed to create file");
+                file.write_all(code.as_bytes()).expect("Failed to write to file");
+
                 PluginResult {
                     code: Some(PluginGeneratedFile {
                         name,
