@@ -303,6 +303,30 @@
       },
       {
         "type": "function",
+        "name": "entity_by_id",
+        "inputs": [
+          {
+            "name": "model",
+            "type": "core::felt252"
+          },
+          {
+            "name": "id",
+            "type": "core::felt252"
+          },
+          {
+            "name": "layout",
+            "type": "dojo::database::introspect::Layout"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::array::Span::<core::felt252>"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
         "name": "set_entity",
         "inputs": [
           {
@@ -312,6 +336,30 @@
           {
             "name": "keys",
             "type": "core::array::Span::<core::felt252>"
+          },
+          {
+            "name": "values",
+            "type": "core::array::Span::<core::felt252>"
+          },
+          {
+            "name": "layout",
+            "type": "dojo::database::introspect::Layout"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "set_entity_by_id",
+        "inputs": [
+          {
+            "name": "model",
+            "type": "core::felt252"
+          },
+          {
+            "name": "id",
+            "type": "core::felt252"
           },
           {
             "name": "values",
