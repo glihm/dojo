@@ -49,6 +49,8 @@ pub struct KatanaRunnerConfig {
     pub port: Option<u16>,
     /// The path where to log info, if None, logs are stored in a temp dir.
     pub log_path: Option<PathBuf>,
+    /// The messaging config file
+    pub messaging: Option<String>,
 }
 
 impl Default for KatanaRunnerConfig {
@@ -61,6 +63,7 @@ impl Default for KatanaRunnerConfig {
             program_name: None,
             run_name: None,
             log_path: None,
+            messaging: None,
         }
     }
 }
@@ -100,6 +103,10 @@ impl KatanaRunner {
 
         if config.disable_fee {
             command.args(["--disable-fee"]);
+        }
+
+        if let Some(messaging_file) = config.messaging {
+            command.args(["--messaging", messaging_file.as_str()]);
         }
 
         let mut child =

@@ -106,24 +106,22 @@ pub fn run(command: Commands, config: &Config) -> Result<()> {
     let span = info_span!("Subcommand", name);
     let _span = span.enter();
 
-    config.tokio_handle().block_on(async {
-        match command {
-            Commands::Account(args) => args.run(config),
-            Commands::Keystore(args) => args.run(config),
-            Commands::Init(args) => args.run(config),
-            Commands::Clean(args) => args.run(config),
-            Commands::Test(args) => args.run(config),
-            Commands::Build(args) => args.run(config),
-            Commands::Migrate(args) => args.run(config).await,
-            Commands::Dev(args) => args.run(config),
-            Commands::Auth(args) => args.run(config),
-            Commands::Execute(args) => args.run(config),
-            Commands::Call(args) => args.run(config),
-            Commands::Model(args) => args.run(config),
-            Commands::Register(args) => args.run(config),
-            Commands::Events(args) => args.run(config),
-            Commands::PrintEnv(args) => args.run(config),
-            Commands::Completions(args) => args.run(),
-        }
-    })
+    match command {
+        Commands::Account(args) => args.run(config),
+        Commands::Keystore(args) => args.run(config),
+        Commands::Init(args) => args.run(config),
+        Commands::Clean(args) => args.run(config),
+        Commands::Test(args) => args.run(config),
+        Commands::Build(args) => args.run(config),
+        Commands::Migrate(args) => args.run(config),
+        Commands::Dev(args) => args.run(config),
+        Commands::Auth(args) => args.run(config),
+        Commands::Execute(args) => args.run(config),
+        Commands::Call(args) => args.run(config),
+        Commands::Model(args) => args.run(config),
+        Commands::Register(args) => args.run(config),
+        Commands::Events(args) => args.run(config),
+        Commands::PrintEnv(args) => args.run(config),
+        Commands::Completions(args) => args.run(),
+    }
 }

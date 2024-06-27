@@ -6,6 +6,8 @@ trait IActions {
     fn move(ref world: IWorldDispatcher, direction: Direction);
     fn set_player_config(ref world: IWorldDispatcher, name: ByteArray);
     fn get_player_position(world: @IWorldDispatcher) -> Position;
+    fn reset_player_config(ref world: IWorldDispatcher);
+    fn set_player_server_profile(ref world: IWorldDispatcher, server_id: u32, name: ByteArray);
 }
 
 #[dojo::interface]
@@ -20,7 +22,9 @@ mod actions {
     use super::IActionsComputed;
 
     use starknet::{ContractAddress, get_caller_address};
-    use dojo_examples::models::{Position, Moves, Direction, Vec2, PlayerConfig, PlayerItem};
+    use dojo_examples::models::{
+        Position, Moves, Direction, Vec2, PlayerConfig, PlayerItem, ServerProfile
+    };
     use dojo_examples::utils::next_position;
 
     #[derive(Copy, Drop, Serde)]
@@ -64,7 +68,7 @@ mod actions {
         // ContractState is defined by system decorator expansion
         fn spawn(ref world: IWorldDispatcher) {
             let player = get_caller_address();
-            self.set_default_position(player);
+            self.set_default_position(player, world);
         }
 
         fn move(ref world: IWorldDispatcher, direction: Direction) {
@@ -89,6 +93,32 @@ mod actions {
             set!(world, (config));
         }
 
+        fn reset_player_config(ref world: IWorldDispatcher) {
+            let player = get_caller_address();
+
+            let (position, moves, config) = get!(world, player, (Position, Moves, PlayerConfig));
+
+            delete!(world, (position, moves, config));
+
+            let (position, moves, config) = get!(world, player, (Position, Moves, PlayerConfig));
+
+            assert(moves.remaining == 0, 'bad remaining');
+            assert(moves.last_direction == Direction::None, 'bad last direction');
+
+            assert(position.vec.x == 0, 'bad x');
+            assert(position.vec.y == 0, 'bad y');
+
+            assert(config.items.len() == 0, 'bad items');
+            assert(config.favorite_item == Option::Some(0), 'bad favorite item');
+            let empty_string: ByteArray = "";
+            assert(config.name == empty_string, 'bad name');
+        }
+
+        fn set_player_server_profile(ref world: IWorldDispatcher, server_id: u32, name: ByteArray) {
+            let player = get_caller_address();
+            set!(world, ServerProfile { player, server_id, name });
+        }
+
         fn get_player_position(world: @IWorldDispatcher) -> Position {
             let player = get_caller_address();
             get!(world, player, (Position))
@@ -99,9 +129,11 @@ mod actions {
     // Hence, the use of `self` to access the contract state.
     #[generate_trait]
     impl InternalImpl of InternalUtils {
-        fn set_default_position(self: @ContractState, player: ContractAddress) {
+        fn set_default_position(
+            self: @ContractState, player: ContractAddress, world: IWorldDispatcher
+        ) {
             // The world is always accessible from `self` inside a `dojo::contract`.
-            let world = self.world();
+            // let world = self.world();
 
             set!(
                 world,

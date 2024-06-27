@@ -1,6 +1,6 @@
 use starknet::ContractAddress;
 
-#[derive(Serde, Copy, Drop, Introspect)]
+#[derive(Serde, Copy, Drop, Introspect, PartialEq)]
 enum Direction {
     None,
     Left,
@@ -84,6 +84,16 @@ struct PlayerConfig {
     name: ByteArray,
     items: Array<PlayerItem>,
     favorite_item: Option<u32>,
+}
+
+#[derive(Drop, Serde)]
+#[dojo::model]
+struct ServerProfile {
+    #[key]
+    player: ContractAddress,
+    #[key]
+    server_id: u32,
+    name: ByteArray,
 }
 
 trait Vec2Trait {
