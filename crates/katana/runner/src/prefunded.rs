@@ -12,7 +12,7 @@ use crate::KatanaRunner;
 
 impl KatanaRunner {
     pub fn accounts_data(&self) -> &[(ContractAddress, DevGenesisAccount)] {
-        &self.accounts[1..] // The first one is used to deploy the contract
+        &self.accounts[..] // The first one is used to deploy the contract
     }
 
     pub fn accounts(&self) -> Vec<SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>> {

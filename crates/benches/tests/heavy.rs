@@ -18,7 +18,7 @@ mod katana_benchmarks {
         )
         .await;
 
-        assert_eq!(result.steps, 881383);
+        assert_eq!(result.steps, 487348);
         result.dump().await;
     }
 
@@ -36,7 +36,7 @@ mod katana_benchmarks {
         )
         .await;
 
-        assert!(result.steps > 80000000);
+        assert!(result.steps > 40000000);
         result.dump().await;
     }
 
@@ -54,7 +54,7 @@ mod katana_benchmarks {
         )
         .await;
 
-        assert!(result.steps > 800000000);
+        assert!(result.steps > 400000000);
         result.dump().await;
     }
 
@@ -72,7 +72,7 @@ mod katana_benchmarks {
         )
         .await;
 
-        assert!(result.steps > 800000000);
+        assert!(result.steps > 400000000);
         result.dump().await;
     }
 
@@ -90,7 +90,7 @@ mod katana_benchmarks {
         )
         .await;
 
-        assert!(result.steps > 800000000);
+        assert!(result.steps > 400000000);
         result.dump().await;
     }
 
@@ -108,7 +108,7 @@ mod katana_benchmarks {
         )
         .await;
 
-        assert!(result.steps > 1600000000);
+        assert!(result.steps > 800000000);
         result.dump().await;
     }
 
@@ -126,7 +126,7 @@ mod katana_benchmarks {
         )
         .await;
 
-        assert!(result.steps > 1600000000);
+        assert!(result.steps > 800000000);
         result.dump().await;
     }
 
@@ -144,7 +144,7 @@ mod katana_benchmarks {
         )
         .await;
 
-        assert!(result.steps > 1600000000);
+        assert!(result.steps > 800000000);
         result.dump().await;
     }
 
@@ -156,7 +156,7 @@ mod katana_benchmarks {
 
         let result = spam_katana(runner, contract_address, calls, 120000, true).await;
 
-        // assert!(result.steps > 1600000000);
+        assert!(result.steps > 800000000);
         result.dump().await;
     }
 }

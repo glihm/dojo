@@ -55,7 +55,7 @@ pub enum MigrateCommand {
 }
 
 impl MigrateArgs {
-    pub fn run(self, config: &Config) -> Result<()> {
+    pub async fn run(self, config: &Config) -> Result<()> {
         trace!(args = ?self);
         let ws = scarb::ops::read_workspace(config.manifest_path(), config)?;
 
@@ -93,9 +93,8 @@ impl MigrateArgs {
             ws.current_package().expect("Root package to be present").id.name.to_string()
         });
 
-        let (world_address, account, rpc_url) = config.tokio_handle().block_on(async {
-            setup_env(&ws, account, starknet, world, &name, env_metadata.as_ref()).await
-        })?;
+        let (world_address, account, rpc_url) =
+            setup_env(&ws, account, starknet, world, &name, env_metadata.as_ref()).await?;
 
         match self.command {
             MigrateCommand::Plan => config.tokio_handle().block_on(async {
@@ -112,7 +111,7 @@ impl MigrateArgs {
                 )
                 .await
             }),
-            MigrateCommand::Apply { transaction } => config.tokio_handle().block_on(async {
+            MigrateCommand::Apply { transaction } => {
                 trace!(name, "Applying migration.");
                 let txn_config: TxnConfig = transaction.into();
 
@@ -127,7 +126,7 @@ impl MigrateArgs {
                     dojo_metadata.skip_migration,
                 )
                 .await
-            }),
+            }
             _ => unreachable!("other case handled above."),
         }
     }

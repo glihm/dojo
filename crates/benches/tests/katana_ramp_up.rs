@@ -11,10 +11,10 @@ mod katana_benchmarks {
         let spawn = BenchCall("spawn", vec![]);
         let calldata_move = BenchCall("move", vec![FieldElement::from_hex_be("0x3").unwrap()]);
 
-        spam_katana(runner, contract_address, vec![spawn, calldata_move], 0, true).await
+        spam_katana(runner, contract_address, vec![spawn, calldata_move], 10000, true).await
     }
 
-    #[katana_runner::katana_test(1, true, "../../target/release/katana")]
+    #[katana_runner::katana_test(10, true, "../../target/release/katana")]
     async fn katana_benchmark_1() {
         let contract_address = deploy(&runner).await.unwrap();
         let results = run(runner, contract_address).await;

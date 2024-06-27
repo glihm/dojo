@@ -92,7 +92,7 @@ mod tests {
         #[test]
         fn bench_default_move(c in "0x[0-4]") {
             runner!(bench_default_move);
-            let contract_address = deploy_sync(&runner).unwrap();
+            let contract_address = deploy_sync(runner).unwrap();
 
             let fee = estimate_gas_last(&runner.account(1), vec![
                 BenchCall("spawn", vec![]),

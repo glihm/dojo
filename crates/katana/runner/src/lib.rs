@@ -20,6 +20,8 @@ use tokio::sync::Mutex;
 use url::Url;
 use utils::find_free_port;
 
+const DEPLOY_ACCOUNT: &str = "0x6162896d1d7ab204c7ccac6dd5f8e9e7c25ecd5ae4fcb4ad32e57786bb46e03";
+
 #[derive(Debug)]
 pub struct KatanaRunner {
     child: Child,
@@ -134,10 +136,14 @@ impl KatanaRunner {
 
         let mut seed = [0; 32];
         seed[0] = 48;
+
+        let deploy_account =
+            ContractAddress::new(FieldElement::from_hex_be(DEPLOY_ACCOUNT).unwrap());
         let accounts = DevAllocationsGenerator::new(n_accounts)
             .with_seed(seed)
             .generate()
             .into_iter()
+            .filter(|(address, _)| address != &deploy_account)
             .collect();
         let contract = Mutex::new(Option::None);
 

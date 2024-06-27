@@ -20,7 +20,7 @@ async fn spam_no_stats(
     wait_time: Duration,
 ) -> FieldElement {
     let max_fee = FieldElement::from_hex_be(ENOUGH_GAS).unwrap();
-    let mut nonce = FieldElement::ONE;
+    let mut nonce = FieldElement::ZERO;
 
     for call in parse_calls(calldata, contract_address) {
         let transactions = accounts

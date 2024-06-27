@@ -29,7 +29,7 @@ starknet.workspace = true
 tokio.workspace = true
 
 [features]
-default = [ "skip-benchmarks" ]
+default = [  ]
 skip-benchmarks = [ "skip-gas-benchmarks", "skip-katana-benchmarks" ]
 skip-gas-benchmarks = [  ]
 skip-katana-benchmarks = [  ]
