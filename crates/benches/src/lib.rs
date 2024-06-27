@@ -14,9 +14,8 @@ pub use starknet::core::types::FieldElement;
 use tokio::runtime::Runtime;
 
 pub const ENOUGH_GAS: &str = "0x100000000000000000";
-pub const CONTRACT: (&str, &str) = ("contracts/Scarb.toml", "contracts/scripts/auth.sh");
-pub const CONTRACT_RELATIVE_TO_TESTS: (&str, &str) =
-    ("../contracts/Scarb.toml", "../contracts/scripts/auth.sh");
+pub const CONTRACT_MANIFEST: &str = "contracts/Scarb.toml";
+pub const CONTRACT_MANIFEST_RELATIVE_TO_TESTS: &str = "../contracts/Scarb.toml";
 
 lazy_static! {
     pub static ref RUNTIME: Runtime = Runtime::new().unwrap();

@@ -35,10 +35,10 @@ pub struct MigrateArgs {
     world: WorldOptions,
 
     #[command(flatten)]
-    starknet: StarknetOptions,
+    pub starknet: StarknetOptions,
 
     #[command(flatten)]
-    account: AccountOptions,
+    pub account: AccountOptions,
 }
 
 #[derive(Debug, Subcommand)]

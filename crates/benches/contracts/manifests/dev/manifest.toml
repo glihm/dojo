@@ -4,14 +4,14 @@ class_hash = "0x3f63cecdc4964acafb921ba2934c6507d1b3c344edb64c2762cf08053169ab9"
 original_class_hash = "0x3f63cecdc4964acafb921ba2934c6507d1b3c344edb64c2762cf08053169ab9"
 abi = "manifests/dev/abis/deployments/dojo_world_world.json"
 address = "0x29f3862ce687019943e612e0ee1e23a03b39ac0b1b065880d8da8694a50b6a7"
-transaction_hash = "0x2201936eea973894ae712a34275be275a17930c4afa0381ef6c491800b70b5f"
-block_number = 9
+transaction_hash = "0x7c563efb5459e03ee5451e2a1499d43451ea23ada567e511a3d584319e6662f"
+block_number = 10
 seed = "benches"
 name = "dojo::world::world"
 
 [world.metadata]
 profile_name = "dev"
-rpc_url = "http://127.0.0.1:41937/"
+rpc_url = "http://127.0.0.1:57207/"
 
 [base]
 kind = "Class"
@@ -30,6 +30,9 @@ reads = []
 writes = [
     "Moves",
     "Position",
+    "Character",
+    "Case",
+    "Alias",
 ]
 computed = []
 init_calldata = []

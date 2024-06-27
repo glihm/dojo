@@ -13,6 +13,7 @@ katana-core = { path = "../katana/core" }
 katana-runner.workspace = true
 
 anyhow.workspace = true
+camino.workspace = true
 clap.workspace = true
 dojo-lang.workspace = true
 dojo-world.workspace = true

@@ -1,4 +1,4 @@
 name = "benches::systems::actions::actions"
 reads = []
-writes = ["Moves", "Position"]
+writes = ["Moves", "Position", "Character", "Case", "Alias"]
 init_calldata = []

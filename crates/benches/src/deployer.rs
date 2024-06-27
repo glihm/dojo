@@ -1,35 +1,33 @@
 use std::env;
 use std::path::PathBuf;
 
-use anyhow::{anyhow, bail, Context, Ok, Result};
-use clap::Parser;
+use anyhow::{bail, Context, Ok, Result};
+use camino::Utf8PathBuf;
 use dojo_lang::compiler::DojoCompiler;
 use dojo_lang::plugin::CairoPluginRepository;
 use dojo_world::manifest::{DeploymentManifest, MANIFESTS_DIR};
-use futures::executor::block_on;
+use dojo_world::migration::TxnConfig;
 use katana_runner::KatanaRunner;
-use scarb::compiler::CompilerRepository;
+use scarb::compiler::{CompilerRepository, Profile};
 use scarb::core::Config;
-use sozo::args::SozoArgs;
-use sozo::commands::Commands;
 use starknet::core::types::FieldElement;
-use tokio::process::Command;
 
-use crate::{CONTRACT, CONTRACT_RELATIVE_TO_TESTS, RUNTIME};
+use crate::{CONTRACT_MANIFEST, CONTRACT_MANIFEST_RELATIVE_TO_TESTS};
 
 pub async fn deploy(runner: &KatanaRunner) -> Result<FieldElement> {
+    println!("Deploying contract {:?}", runner.log_file_path());
     if let Some(contract) = runner.contract().await {
         return Ok(contract);
     }
 
-    let contract = if PathBuf::from(CONTRACT.0).exists() {
-        CONTRACT
+    let contract = if PathBuf::from(CONTRACT_MANIFEST).exists() {
+        CONTRACT_MANIFEST
     } else {
-        if !PathBuf::from(CONTRACT_RELATIVE_TO_TESTS.0).exists() {
+        if !PathBuf::from(CONTRACT_MANIFEST_RELATIVE_TO_TESTS).exists() {
             bail!("manifest not found")
         }
         // calls in the `tests` dir use paths relative to itselfs
-        CONTRACT_RELATIVE_TO_TESTS
+        CONTRACT_MANIFEST_RELATIVE_TO_TESTS
     };
 
     let address = deploy_contract(runner, contract).await?;
@@ -37,60 +35,46 @@ pub async fn deploy(runner: &KatanaRunner) -> Result<FieldElement> {
     Ok(address)
 }
 
-async fn deploy_contract(
-    runner: &KatanaRunner,
-    manifest_and_script: (&str, &str),
-) -> Result<FieldElement> {
-    let args = SozoArgs::parse_from([
-        "sozo",
-        "migrate",
-        "apply",
-        "--rpc-url",
-        &runner.endpoint(),
-        "--manifest-path",
-        manifest_and_script.0,
-    ]);
-
-    let contract_address = prepare_migration_args(args)?;
-
-    let out = Command::new("bash")
-        .arg(manifest_and_script.1)
-        .env("RPC_URL", &runner.endpoint())
-        .output()
-        .await
-        .context("failed to start script subprocess")?;
-
-    if !out.status.success() {
-        return Err(anyhow::anyhow!("script failed {:?}", out));
-    }
+async fn deploy_contract(runner: &KatanaRunner, manifest: &str) -> Result<FieldElement> {
+    let contract_address = prepare_migration_args(runner, manifest).await?;
 
     Ok(contract_address)
 }
 
-fn prepare_migration_args(args: SozoArgs) -> Result<FieldElement> {
+async fn prepare_migration_args(
+    runner: &KatanaRunner,
+    manifest_path: &str,
+) -> Result<FieldElement> {
     // Preparing config, as in https://github.com/dojoengine/dojo/blob/25fbb7fc973cff4ce1273625c4664545d9b088e9/bin/sozo/src/main.rs#L28-L29
     let mut compilers = CompilerRepository::std();
     let cairo_plugins = CairoPluginRepository::default();
     compilers.add(Box::new(DojoCompiler)).unwrap();
-    let manifest_path = scarb::ops::find_manifest_path(args.manifest_path.as_deref())?;
+
+    let manifest_path = Utf8PathBuf::from(manifest_path);
+    let manifest_path = scarb::ops::find_manifest_path(Some(&manifest_path))?;
 
     let config = Config::builder(manifest_path.clone())
         .log_filter_directive(env::var_os("SCARB_LOG"))
-        .profile(args.profile_spec.determine()?)
-        .offline(args.offline)
+        .profile(Profile::DEV)
+        .offline(false)
         .cairo_plugins(cairo_plugins.into())
-        .ui_verbosity(args.ui_verbosity())
         .compilers(compilers)
         .build()
         .context("failed to build config")?;
 
-    // Extractiong migration command, as here https://github.com/dojoengine/dojo/blob/25fbb7fc973cff4ce1273625c4664545d9b088e9/bin/sozo/src/commands/mod.rs#L24-L25
-    let migrate = match args.command {
-        Commands::Migrate(migrate) => *migrate,
-        _ => return Err(anyhow!("failed to parse migrate args")),
-    };
+    let ws = scarb::ops::read_workspace(config.manifest_path(), &config)?;
 
-    migrate.run(&config)?;
+    sozo_ops::migration::migrate(
+        &ws,
+        None,
+        runner.endpoint(),
+        runner.account(0),
+        ws.current_package().expect("Root package to be present").id.name.as_str(),
+        false,
+        TxnConfig::init_wait(),
+        None,
+    )
+    .await?;
 
     let manifest_dir = manifest_path.parent().unwrap();
 

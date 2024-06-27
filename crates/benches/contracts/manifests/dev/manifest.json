@@ -1000,12 +1000,12 @@
       }
     ],
     "address": "0x29f3862ce687019943e612e0ee1e23a03b39ac0b1b065880d8da8694a50b6a7",
-    "transaction_hash": "0x2201936eea973894ae712a34275be275a17930c4afa0381ef6c491800b70b5f",
-    "block_number": 9,
+    "transaction_hash": "0x7c563efb5459e03ee5451e2a1499d43451ea23ada567e511a3d584319e6662f",
+    "block_number": 10,
     "seed": "benches",
     "metadata": {
       "profile_name": "dev",
-      "rpc_url": "http://127.0.0.1:34327/"
+      "rpc_url": "http://127.0.0.1:57207/"
     },
     "name": "dojo::world::world"
   },
@@ -1519,7 +1519,10 @@
       "reads": [],
       "writes": [
         "Moves",
-        "Position"
+        "Position",
+        "Character",
+        "Case",
+        "Alias"
       ],
       "computed": [],
       "init_calldata": [],

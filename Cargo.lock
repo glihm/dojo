@@ -1666,6 +1666,7 @@ name = "benches"
 version = "0.7.3-alpha.1"
 dependencies = [
  "anyhow",
+ "camino",
  "clap",
  "clap_builder",
  "dojo-lang",

@@ -47,6 +47,8 @@ pub async fn spam_katana(
 ) -> BenchSummary {
     let max_fee = FieldElement::from_hex_be(ENOUGH_GAS).unwrap();
 
+    runner.blocks_until_empty().await;
+
     let transaction_sum_before: u32 = runner.block_sizes().await.iter().sum();
     let steps_before = runner.steps().await;
 
@@ -77,7 +79,16 @@ pub async fn spam_katana(
     // the benchmarked transaction
     let final_transactions = accounts
         .iter()
-        .map(|account| {
+        .enumerate()
+        .map(|(i, account)| {
+            // If i == 0, it's the first account, used for all the setup. Hence some transaction
+            // already sent.
+            let nonce = if i == 0 {
+                nonce + FieldElement::from(transaction_sum_before as u64)
+            } else {
+                nonce
+            };
+
             let move_call = account.execute(calls.clone()).nonce(nonce).max_fee(max_fee);
             move_call
         })
