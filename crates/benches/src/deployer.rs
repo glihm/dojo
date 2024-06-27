@@ -37,11 +37,6 @@ pub async fn deploy(runner: &KatanaRunner) -> Result<FieldElement> {
     Ok(address)
 }
 
-pub fn deploy_sync(runner: &KatanaRunner) -> Result<FieldElement> {
-    let _rt = RUNTIME.enter();
-    block_on(async move { deploy(runner).await })
-}
-
 async fn deploy_contract(
     runner: &KatanaRunner,
     manifest_and_script: (&str, &str),
@@ -56,7 +51,7 @@ async fn deploy_contract(
         manifest_and_script.0,
     ]);
 
-    let contract_address = prepare_migration_args(args).await?;
+    let contract_address = prepare_migration_args(args)?;
 
     let out = Command::new("bash")
         .arg(manifest_and_script.1)
@@ -72,7 +67,7 @@ async fn deploy_contract(
     Ok(contract_address)
 }
 
-async fn prepare_migration_args(args: SozoArgs) -> Result<FieldElement> {
+fn prepare_migration_args(args: SozoArgs) -> Result<FieldElement> {
     // Preparing config, as in https://github.com/dojoengine/dojo/blob/25fbb7fc973cff4ce1273625c4664545d9b088e9/bin/sozo/src/main.rs#L28-L29
     let mut compilers = CompilerRepository::std();
     let cairo_plugins = CairoPluginRepository::default();
@@ -95,7 +90,7 @@ async fn prepare_migration_args(args: SozoArgs) -> Result<FieldElement> {
         _ => return Err(anyhow!("failed to parse migrate args")),
     };
 
-    migrate.run(&config).await?;
+    migrate.run(&config)?;
 
     let manifest_dir = manifest_path.parent().unwrap();
 

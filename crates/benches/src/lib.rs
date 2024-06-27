@@ -4,7 +4,7 @@ pub mod spammer;
 pub mod summary;
 
 use anyhow::Result;
-pub use deployer::{deploy, deploy_sync};
+pub use deployer::deploy;
 use futures::executor::block_on;
 use futures::future;
 pub use helpers::*;
