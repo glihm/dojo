@@ -102,7 +102,8 @@ impl Compiler for DojoCompiler {
         // sole package with the `dojo` target.
         // In this case, we can use this path to output the manifests.
 
-        let compiler_config = build_compiler_config(&unit, ws);
+        let main_crate_ids = collect_main_crate_ids(&unit, db);
+        let compiler_config = build_compiler_config(db, &unit, &main_crate_ids, ws);
 
         trace!(target: LOG_TARGET, unit = %unit.name(), ?props, "Compiling unit dojo compiler.");
 
@@ -316,47 +317,44 @@ fn update_files(
 
     for crate_id in crate_ids {
         for module_id in db.crate_modules(crate_id).as_ref() {
-            let file_infos =
-                db.module_generated_file_infos(*module_id).unwrap_or(std::sync::Arc::new([]));
-            for aux_data in file_infos
+            let file_aux_data =
+                db.module_generated_file_aux_data(*module_id).unwrap_or(std::sync::Arc::new([]));
+            for dojo_aux_data in file_aux_data
                 .iter()
-                .skip(1)
-                .filter_map(|info| info.as_ref().map(|i| &i.aux_data))
-                .filter_map(|aux_data| aux_data.as_ref().map(|aux_data| aux_data.0.as_any()))
+                .filter_map(|ad| ad.as_ref().map(|i| i.as_any().downcast_ref::<DojoAuxData>()))
+                .flatten()
             {
-                if let Some(dojo_aux_data) = aux_data.downcast_ref::<DojoAuxData>() {
-                    // For the contracts, the `module_id` is the parent module of the actual
-                    // contract. Hence, the full path of the contract must be
-                    // reconstructed with the contract's name inside the
-                    // `get_dojo_contract_artifacts` function.
-                    for contract in &dojo_aux_data.contracts {
-                        contracts.extend(get_dojo_contract_artifacts(
-                            db,
-                            module_id,
-                            &naming::get_tag(&contract.namespace, &contract.name),
-                            &compiled_artifacts,
-                            &contract.systems,
-                        )?);
-                    }
-
-                    // For the models, the `struct_id` is the full path including the struct's name
-                    // already. The `get_dojo_model_artifacts` function handles
-                    // the reconstruction of the full path by also using lower
-                    // case for the model's name to match the compiled artifacts of the generated
-                    // contract.
-                    models.extend(get_dojo_model_artifacts(
+                // For the contracts, the `module_id` is the parent module of the actual
+                // contract. Hence, the full path of the contract must be
+                // reconstructed with the contract's name inside the
+                // `get_dojo_contract_artifacts` function.
+                for contract in &dojo_aux_data.contracts {
+                    contracts.extend(get_dojo_contract_artifacts(
                         db,
-                        &dojo_aux_data.models,
-                        *module_id,
+                        module_id,
+                        &naming::get_tag(&contract.namespace, &contract.name),
                         &compiled_artifacts,
+                        &contract.systems,
                     )?);
                 }
 
-                // StarknetAuxData shouldn't be required. Every dojo contract and model are starknet
-                // contracts under the hood. But the dojo aux data are attached to
-                // the parent module of the actual contract, so StarknetAuxData will
-                // only contain the contract's name.
+                // For the models, the `struct_id` is the full path including the struct's name
+                // already. The `get_dojo_model_artifacts` function handles
+                // the reconstruction of the full path by also using lower
+                // case for the model's name to match the compiled artifacts of the generated
+                // contract.
+                models.extend(get_dojo_model_artifacts(
+                    db,
+                    &dojo_aux_data.models,
+                    *module_id,
+                    &compiled_artifacts,
+                )?);
             }
+
+            // StarknetAuxData shouldn't be required. Every dojo contract and model are starknet
+            // contracts under the hood. But the dojo aux data are attached to
+            // the parent module of the actual contract, so StarknetAuxData will
+            // only contain the contract's name.
         }
     }
 

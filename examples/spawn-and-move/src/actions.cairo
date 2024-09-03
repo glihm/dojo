@@ -1,4 +1,4 @@
-use dojo_examples::models::{Direction, Position, Vec2, PlayerItem};
+use dojo_examples::models::{Direction, Position, PlayerItem};
 
 #[dojo::interface]
 pub trait IActions {

@@ -72,7 +72,6 @@ struct Health {
 }
 
 //! > function_code
-let key: felt252 = 0xb0b;
 let world = IWorldDispatcher{contract_address: 0x0.try_into().unwrap()};
 
 //! > expression
@@ -120,7 +119,7 @@ Block(
                 StatementExpr {
                     expr: FunctionCall(
                         ExprFunctionCall {
-                            function: ?6::set_model,
+                            function: ?5::set_model,
                             args: [
                                 Value(
                                     Snapshot(
@@ -156,12 +155,7 @@ error: Plugin diagnostic: The namespace '' can only contain characters (a-z/A-Z)
 struct Health {
        ^****^
 
-warning[E0001]: Unused variable. Consider ignoring by prefixing with `_`.
- --> lib.cairo:10:22
-fn test_func() { let key: felt252 = 0xb0b;
-                     ^*^
-
 error: Trait has no implementation in context: dojo::model::model::Model::<test::Health>.
- --> lib.cairo:12:1
+ --> lib.cairo:11:1
 set!(world, (Health{id: 0xb0b, health: 79}))
 ^******************************************^

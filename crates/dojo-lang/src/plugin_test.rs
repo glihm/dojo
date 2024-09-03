@@ -1,28 +1,103 @@
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use cairo_lang_defs::db::{DefsDatabase, DefsGroup};
+use cairo_lang_compiler::db::RootDatabase;
+use cairo_lang_compiler::diagnostics::get_diagnostics_as_string;
+use cairo_lang_debug::debug::DebugWithDb;
+use cairo_lang_defs::db::DefsGroup;
 use cairo_lang_defs::ids::ModuleId;
-use cairo_lang_defs::plugin::MacroPlugin;
-use cairo_lang_filesystem::cfg::CfgSet;
-use cairo_lang_filesystem::db::{
-    init_files_group, AsFilesGroupMut, CrateConfiguration, FilesDatabase, FilesGroup, FilesGroupEx,
-};
-use cairo_lang_filesystem::ids::{CrateLongId, Directory};
-use cairo_lang_parser::db::ParserDatabase;
-use cairo_lang_plugins::get_base_plugins;
-use cairo_lang_plugins::test_utils::expand_module_text;
-use cairo_lang_starknet::plugin::StarkNetPlugin;
-use cairo_lang_syntax::node::db::{SyntaxDatabase, SyntaxGroup};
-use cairo_lang_test_utils::parse_test_file::TestRunnerResult;
-use cairo_lang_test_utils::verify_diagnostics_expectation;
+use cairo_lang_diagnostics::DiagnosticLocation;
+use cairo_lang_filesystem::cfg::{Cfg, CfgSet};
+use cairo_lang_filesystem::db::FilesGroup;
+use cairo_lang_filesystem::ids::Directory;
+use cairo_lang_filesystem::span::{TextOffset, TextSpan, TextWidth};
+use cairo_lang_project::{AllCratesConfig, ProjectConfig, ProjectConfigContent};
+use cairo_lang_semantic::test_utils::setup_test_module;
+use cairo_lang_starknet::starknet_plugin_suite;
+use cairo_lang_test_utils::parse_test_file::{TestFileRunner, TestRunnerResult};
+use cairo_lang_test_utils::{get_direct_or_file_content, verify_diagnostics_expectation};
 use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
 use cairo_lang_utils::Upcast;
+use dojo_test_utils::compiler::corelib;
+use dojo_world::config::DEFAULT_NAMESPACE_CFG_KEY;
 
-use super::BuiltinDojoPlugin;
+use super::dojo_plugin_suite;
 
-cairo_lang_test_utils::test_file_test!(
-    expand_plugin,
+#[derive(Default)]
+struct ExpandContractTestRunner {}
+
+impl TestFileRunner for ExpandContractTestRunner {
+    fn run(
+        &mut self,
+        inputs: &OrderedHashMap<String, String>,
+        args: &OrderedHashMap<String, String>,
+    ) -> TestRunnerResult {
+        let mut cfg_set = CfgSet::new();
+
+        cfg_set
+            .insert(Cfg { key: DEFAULT_NAMESPACE_CFG_KEY.into(), value: Some("dojo_test".into()) });
+
+        let db = RootDatabase::builder()
+            .with_project_config(ProjectConfig {
+                base_path: PathBuf::from("./"),
+                corelib: Some(Directory::Real(corelib())),
+                content: ProjectConfigContent {
+                    crate_roots: OrderedHashMap::default(),
+                    crates_config: AllCratesConfig::default(),
+                },
+            })
+            .with_cfg(cfg_set)
+            .with_plugin_suite(dojo_plugin_suite())
+            .with_plugin_suite(starknet_plugin_suite())
+            .build()
+            .unwrap();
+
+        let (_, cairo_code) = get_direct_or_file_content(&inputs["cairo_code"]);
+        let (test_module, _semantic_diagnostics) = setup_test_module(&db, &cairo_code).split();
+
+        let mut module_ids = vec![test_module.module_id];
+        if let Ok(submodules_ids) = db.module_submodules_ids(test_module.module_id) {
+            module_ids.extend(submodules_ids.iter().copied().map(ModuleId::Submodule));
+        }
+        let mut files = vec![];
+        for module_files in
+            module_ids.into_iter().filter_map(|module_id| db.module_files(module_id).ok())
+        {
+            for file in module_files.iter().copied() {
+                if !files.contains(&file) {
+                    files.push(file);
+                }
+            }
+        }
+        let mut file_contents = vec![];
+
+        for file_id in files {
+            let content = db.file_content(file_id).unwrap();
+            let start = TextOffset::default();
+            let end = start.add_width(TextWidth::from_str(&content));
+            let content_location = DiagnosticLocation { file_id, span: TextSpan { start, end } };
+            let original_location = content_location.user_location(db.upcast());
+            let origin = (content_location != original_location)
+                .then(|| format!("{:?}\n", original_location.debug(db.upcast())))
+                .unwrap_or_default();
+            let file_name = file_id.file_name(&db);
+            file_contents.push(format!("{origin}{file_name}:\n\n{content}"));
+        }
+
+        let diagnostics = get_diagnostics_as_string(&db, &[test_module.crate_id]);
+        let error = verify_diagnostics_expectation(args, &diagnostics);
+
+        TestRunnerResult {
+            outputs: OrderedHashMap::from([
+                ("generated_cairo_code".into(), file_contents.join("\n\n")),
+                ("expected_diagnostics".into(), diagnostics),
+            ]),
+            error,
+        }
+    }
+}
+
+cairo_lang_test_utils::test_file_test_with_runner!(
+    expand_contract,
     "src/plugin_test_data",
     {
         model: "model",
@@ -30,128 +105,5 @@ cairo_lang_test_utils::test_file_test!(
         introspect: "introspect",
         system: "system",
     },
-    test_expand_plugin
+    ExpandContractTestRunner
 );
-
-pub fn test_expand_plugin(
-    inputs: &OrderedHashMap<String, String>,
-    args: &OrderedHashMap<String, String>,
-) -> TestRunnerResult {
-    test_expand_plugin_inner(
-        inputs,
-        args,
-        &[Arc::new(BuiltinDojoPlugin), Arc::new(StarkNetPlugin::default())],
-    )
-}
-
-#[salsa::database(DefsDatabase, ParserDatabase, SyntaxDatabase, FilesDatabase)]
-#[allow(missing_debug_implementations)]
-pub struct DatabaseForTesting {
-    storage: salsa::Storage<DatabaseForTesting>,
-}
-impl salsa::Database for DatabaseForTesting {}
-impl Default for DatabaseForTesting {
-    fn default() -> Self {
-        let mut res = Self { storage: Default::default() };
-        init_files_group(&mut res);
-        res.set_macro_plugins(get_base_plugins());
-        res
-    }
-}
-impl AsFilesGroupMut for DatabaseForTesting {
-    fn as_files_group_mut(&mut self) -> &mut (dyn FilesGroup + 'static) {
-        self
-    }
-}
-impl Upcast<dyn DefsGroup> for DatabaseForTesting {
-    fn upcast(&self) -> &(dyn DefsGroup + 'static) {
-        self
-    }
-}
-impl Upcast<dyn FilesGroup> for DatabaseForTesting {
-    fn upcast(&self) -> &(dyn FilesGroup + 'static) {
-        self
-    }
-}
-impl Upcast<dyn SyntaxGroup> for DatabaseForTesting {
-    fn upcast(&self) -> &(dyn SyntaxGroup + 'static) {
-        self
-    }
-}
-
-/// Tests expansion of given code, with the default plugins plus the given extra plugins.
-pub fn test_expand_plugin_inner(
-    inputs: &OrderedHashMap<String, String>,
-    args: &OrderedHashMap<String, String>,
-    extra_plugins: &[Arc<dyn MacroPlugin>],
-) -> TestRunnerResult {
-    let db = &mut DatabaseForTesting::default();
-    let mut plugins = db.macro_plugins();
-    plugins.extend_from_slice(extra_plugins);
-    db.set_macro_plugins(plugins);
-
-    let cfg_set: Option<CfgSet> =
-        inputs.get("cfg").map(|s| serde_json::from_str(s.as_str()).unwrap());
-    if let Some(cfg_set) = cfg_set {
-        db.set_cfg_set(Arc::new(cfg_set));
-    }
-
-    let test_id = &inputs["test_id"];
-    let cairo_code = &inputs["cairo_code"];
-
-    // The path as to remain the same, because diagnostics contains the path
-    // of the file. Which can cause error when checked without CAIRO_FIX=1.
-    let tmp_dir = PathBuf::from(format!("/tmp/plugin_test/{}", test_id));
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    let tmp_path = tmp_dir.as_path();
-
-    // Create Scarb.toml file
-    let scarb_toml_path = tmp_path.join("Scarb.toml");
-    std::fs::write(
-        scarb_toml_path,
-        r#"
-[package]
-cairo-version = "=2.6.4"
-edition = "2024_07"
-name = "test_package"
-version = "0.7.3"
-
-[cairo]
-sierra-replace-ids = true
-
-[[target.dojo]]
-
-[tool.dojo.world]
-namespace = { default = "test_package" }
-seed = "test_package"
-"#,
-    )
-    .expect("Failed to write Scarb.toml");
-
-    // Create src directory
-    let src_dir = tmp_path.join("src");
-    let _ = std::fs::create_dir(&src_dir);
-
-    // Create lib.cairo file
-    let lib_cairo_path = src_dir.join("lib.cairo");
-    std::fs::write(lib_cairo_path, cairo_code).expect("Failed to write lib.cairo");
-
-    let crate_id = db.intern_crate(CrateLongId::Real("test".into()));
-    let root = Directory::Real(src_dir.to_path_buf());
-
-    db.set_crate_config(crate_id, Some(CrateConfiguration::default_for_root(root)));
-
-    let mut diagnostic_items = vec![];
-    let expanded_module =
-        expand_module_text(db, ModuleId::CrateRoot(crate_id), &mut diagnostic_items);
-    let joined_diagnostics = diagnostic_items.join("\n");
-    let error = verify_diagnostics_expectation(args, &joined_diagnostics);
-
-    TestRunnerResult {
-        outputs: OrderedHashMap::from([
-            ("expanded_cairo_code".into(), expanded_module),
-            ("expected_diagnostics".into(), joined_diagnostics),
-        ]),
-        error,
-    }
-}

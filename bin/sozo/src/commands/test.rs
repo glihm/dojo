@@ -6,7 +6,7 @@ use cairo_lang_compiler::project::{ProjectConfig, ProjectConfigContent};
 use cairo_lang_filesystem::cfg::{Cfg, CfgSet};
 use cairo_lang_filesystem::ids::Directory;
 use cairo_lang_starknet::starknet_plugin_suite;
-use cairo_lang_test_plugin::test_plugin_suite;
+use cairo_lang_test_plugin::{test_plugin_suite, TestsCompilationConfig};
 use cairo_lang_test_runner::{CompiledTestRunner, RunProfilerConfig, TestCompiler, TestRunConfig};
 use clap::Args;
 use dojo_lang::compiler::{collect_core_crate_ids, collect_external_crate_ids, Props};
@@ -179,8 +179,17 @@ impl TestArgs {
                 print_resource_usage: self.print_resource_usage,
             };
 
-            let compiler =
-                TestCompiler { db: db.snapshot(), main_crate_ids, test_crate_ids, starknet: true };
+            let compiler = TestCompiler {
+                db: db.snapshot(),
+                main_crate_ids,
+                test_crate_ids,
+                allow_warnings: true,
+                config: TestsCompilationConfig {
+                    starknet: true,
+                    add_statements_functions: true,
+                    add_statements_code_locations: true,
+                },
+            };
 
             let compiled = compiler.build()?;
             let runner = CompiledTestRunner { compiled, config };

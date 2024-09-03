@@ -17,14 +17,14 @@ dependencies = [
 
 [[package]]
 name = "dojo"
-version = "1.0.0-alpha.4"
+version = "1.0.0-alpha.9"
 dependencies = [
  "dojo_plugin",
 ]
 
 [[package]]
 name = "dojo_examples"
-version = "1.0.0-alpha.8"
+version = "1.0.0-alpha.9"
 dependencies = [
  "armory",
  "bestiary",

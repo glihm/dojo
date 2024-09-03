@@ -67,6 +67,7 @@ pub fn crates_config_for_compilation_unit(unit: &CairoCompilationUnit) -> AllCra
                         coupons: experimental_features.contains(&SmolStr::new_inline("coupons")),
                     },
                     cfg_set: component.cfg_set.clone(),
+                    version: Some(component.package.id.version.clone()),
                 },
             )
         })
@@ -184,10 +185,11 @@ fn build_project_config(unit: &CairoCompilationUnit) -> Result<ProjectConfig> {
         .map(|model| (model.cairo_package_name(), model.targets[0].source_root().into()))
         .collect();
 
-    let corelib =
-        // NOTE: We're taking the first target of the corelib, which should always be the
-        //       main package source root due to the order maintained by scarb.
-        unit.core_package_component().map(|c| Directory::Real(c.targets[0].source_root().into()));
+    let corelib = if let Some(cl) = unit.components().iter().find(|c| c.package.id.is_core()) {
+        Some(Directory::Real(cl.first_target().source_root().into()))
+    } else {
+        anyhow::bail!("Core library not found");
+    };
 
     let content = ProjectConfigContent {
         crate_roots,

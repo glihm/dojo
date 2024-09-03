@@ -1,7 +1,7 @@
 //! > Test expansion of the derive(Print).
 
 //! > test_runner_name
-test_expand_plugin
+ExpandContractTestRunner(expect_diagnostics: true)
 
 //! > test_id
 print
@@ -115,22 +115,122 @@ Enemy::OtherPlayer(v) => { core::debug::PrintTrait::print('OtherPlayer'); core::
 }
 
 //! > expected_diagnostics
-error: Unknown derive `Print` - a plugin might be missing.
- --> /tmp/plugin_test/print/src/lib.cairo:4:10
+error: Plugin diagnostic: Unknown derive `Print` - a plugin might be missing.
+ --> lib.cairo:4:10
 #[derive(Print)]
          ^***^
 
-error: Unknown derive `Print` - a plugin might be missing.
- --> /tmp/plugin_test/print/src/lib.cairo:12:10
+error: Plugin diagnostic: Unknown derive `Print` - a plugin might be missing.
+ --> lib.cairo:12:10
 #[derive(Print)]
          ^***^
 
-error: Unknown derive `Print` - a plugin might be missing.
- --> /tmp/plugin_test/print/src/lib.cairo:19:10
+error: Plugin diagnostic: Unknown derive `Print` - a plugin might be missing.
+ --> lib.cairo:19:10
 #[derive(Print)]
          ^***^
 
-error: Unknown derive `Print` - a plugin might be missing.
- --> /tmp/plugin_test/print/src/lib.cairo:28:10
+error: Plugin diagnostic: Unknown derive `Print` - a plugin might be missing.
+ --> lib.cairo:28:10
 #[derive(Print)]
          ^***^
+
+//! > generated_cairo_code
+lib.cairo:
+
+use serde::Serde;
+use debug::PrintTrait;
+
+#[derive(Print)]
+struct Position {
+    #[key]
+    id: felt252,
+    x: felt252,
+    y: felt252
+}
+
+#[derive(Print)]
+struct Roles {
+    role_ids: Array<u8>
+}
+
+use starknet::ContractAddress;
+
+#[derive(Print)]
+struct Player {
+    #[key]
+    game: felt252,
+    #[key]
+    player: ContractAddress,
+    name: felt252,
+}
+
+#[derive(Print)]
+enum Enemy {
+    Unknown,
+    Bot: felt252,
+    OtherPlayer: ContractAddress,
+}
+
+lib.cairo:4:1
+#[derive(Print)]
+^**************^
+Position:
+
+
+#[cfg(test)]
+impl PositionStructPrintImpl of core::debug::PrintTrait<Position> {
+    fn print(self: Position) {
+        core::debug::PrintTrait::print('id'); core::debug::PrintTrait::print(self.id);
+core::debug::PrintTrait::print('x'); core::debug::PrintTrait::print(self.x);
+core::debug::PrintTrait::print('y'); core::debug::PrintTrait::print(self.y);
+    }
+}
+
+
+lib.cairo:12:1
+#[derive(Print)]
+^**************^
+Roles:
+
+
+#[cfg(test)]
+impl RolesStructPrintImpl of core::debug::PrintTrait<Roles> {
+    fn print(self: Roles) {
+        core::debug::PrintTrait::print('role_ids'); core::debug::PrintTrait::print(self.role_ids);
+    }
+}
+
+
+lib.cairo:19:1
+#[derive(Print)]
+^**************^
+Player:
+
+
+#[cfg(test)]
+impl PlayerStructPrintImpl of core::debug::PrintTrait<Player> {
+    fn print(self: Player) {
+        core::debug::PrintTrait::print('game'); core::debug::PrintTrait::print(self.game);
+core::debug::PrintTrait::print('player'); core::debug::PrintTrait::print(self.player);
+core::debug::PrintTrait::print('name'); core::debug::PrintTrait::print(self.name);
+    }
+}
+
+
+lib.cairo:28:1
+#[derive(Print)]
+^**************^
+Enemy:
+
+
+#[cfg(test)]
+impl EnemyEnumPrintImpl of core::debug::PrintTrait<Enemy> {
+    fn print(self: Enemy) {
+        match self {
+            Enemy::Unknown => { core::debug::PrintTrait::print('Unknown'); },
+Enemy::Bot(v) => { core::debug::PrintTrait::print('Bot'); core::debug::PrintTrait::print(v); },
+Enemy::OtherPlayer(v) => { core::debug::PrintTrait::print('OtherPlayer'); core::debug::PrintTrait::print(v); }
+        }
+    }
+}
