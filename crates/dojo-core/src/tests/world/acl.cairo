@@ -278,3 +278,144 @@ fn test_not_writer_with_known_contract() {
     let d = IFooSetterDispatcher { contract_address };
     d.set_foo(1, 2);
 }
+
+
+// ---------------------------
+
+#[starknet::contract]
+pub mod attacker_contract {
+    use dojo::world;
+    use dojo::world::IWorldDispatcher;
+    use dojo::world::IWorldDispatcherTrait;
+    use dojo::world::IWorldProvider;
+    use dojo::contract::IContract;
+    use starknet::storage::{
+        StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess, StoragePointerWriteAccess
+    };
+
+    #[storage]
+    struct Storage {
+        world_dispatcher: IWorldDispatcher,
+    }
+
+    #[abi(embed_v0)]
+    pub impl ContractImpl of IContract<ContractState> {
+        fn contract_name(self: @ContractState) -> ByteArray {
+            "test_1"
+        }
+
+        fn namespace(self: @ContractState) -> ByteArray {
+            "ns1"
+        }
+
+        fn tag(self: @ContractState) -> ByteArray {
+            "other tag"
+        }
+
+        fn name_hash(self: @ContractState) -> felt252 {
+            'name hash'
+        }
+
+        fn namespace_hash(self: @ContractState) -> felt252 {
+            dojo::utils::bytearray_hash(@"atk")
+        }
+
+        fn selector(self: @ContractState) -> felt252 {
+            selector_from_tag!("dojo-Foo")
+        }
+    }
+
+    #[abi(embed_v0)]
+    impl WorldProviderImpl of IWorldProvider<ContractState> {
+        fn world(self: @ContractState) -> IWorldDispatcher {
+            self.world_dispatcher.read()
+        }
+    }
+}
+
+#[starknet::contract]
+pub mod attacker_model {
+    #[storage]
+    struct Storage {}
+
+    #[abi(embed_v0)]
+    impl DojoModelImpl of dojo::model::IModel<ContractState> {
+        fn name(self: @ContractState) -> ByteArray {
+            "m1"
+        }
+
+        fn namespace(self: @ContractState) -> ByteArray {
+            "ns1"
+        }
+
+        fn tag(self: @ContractState) -> ByteArray {
+            "other tag"
+        }
+
+        fn version(self: @ContractState) -> u8 {
+            1
+        }
+
+        fn selector(self: @ContractState) -> felt252 {
+            selector_from_tag!("dojo-Foo")
+        }
+
+        fn name_hash(self: @ContractState) -> felt252 {
+            'name hash'
+        }
+
+        fn namespace_hash(self: @ContractState) -> felt252 {
+            // "atk" hash
+            dojo::utils::bytearray_hash(@"atk")
+        }
+
+        fn unpacked_size(self: @ContractState) -> Option<usize> {
+            Option::None
+        }
+
+        fn packed_size(self: @ContractState) -> Option<usize> {
+            Option::None
+        }
+
+        fn layout(self: @ContractState) -> dojo::model::Layout {
+            dojo::model::Layout::Fixed([].span())
+        }
+
+        fn schema(self: @ContractState) -> dojo::model::introspect::Ty {
+            dojo::model::introspect::Ty::Primitive('felt252')
+        }
+    }
+}
+
+#[test]
+fn test_attacker_control_hashes() {
+    let owner = starknet::contract_address_const::<'owner'>();
+    let attacker = starknet::contract_address_const::<'attacker'>();
+
+    starknet::testing::set_account_contract_address(owner);
+    starknet::testing::set_contract_address(owner);
+
+    // Owner deploys the world and register Foo model.
+    let world = deploy_world();
+    world.register_model(foo::TEST_CLASS_HASH.try_into().unwrap());
+
+    let foo_selector = Model::<Foo>::selector();
+
+    assert(world.is_owner(foo_selector, owner), 'should be owner');
+
+    starknet::testing::set_contract_address(attacker);
+    starknet::testing::set_account_contract_address(attacker);
+
+    // Attacker has control over the this namespace.
+    world.register_namespace("atk");
+
+    // Attacker can't take ownership of the Foo model.
+    // world.register_model(attacker_model::TEST_CLASS_HASH.try_into().unwrap());
+
+    // Attacker can however deploy a contract and takes ownership of the Foo model.
+    let _contract_address = world.deploy_contract('salt1', attacker_contract::TEST_CLASS_HASH.try_into().unwrap());
+
+    assert(world.is_owner(foo_selector, starknet::get_contract_address()), 'world should be owner');
+
+    assert(!world.is_owner(foo_selector, attacker), 'attacker should not be owner');
+}
