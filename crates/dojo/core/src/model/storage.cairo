@@ -20,15 +20,24 @@ pub trait ModelStorage<S, M> {
     /// Sets a model of type `M`.
     fn write_model(ref self: S, model: @M);
 
+    /// Sets multiple models of type `M`.
+    fn write_models(ref self: S, models: Span<@M>);
+
     /// Retrieves a model of type `M` using the provided key of type `K`.
     fn read_model<K, +Drop<K>, +Serde<K>>(self: @S, key: K) -> M;
 
     /// Deletes a model of type `M`.
     fn erase_model(ref self: S, model: @M);
 
+    /// Deletes multiple models of type `M`.
+    fn erase_models(ref self: S, models: Span<@M>);
+
     /// Deletes a model of type `M` using the provided entity id.
     /// The ptr is mostly used for type inferrence.
     fn erase_model_ptr(ref self: S, ptr: ModelPtr<M>);
+
+    /// Deletes multiple models of type `M` using the provided entity ids.
+    fn erase_models_ptrs(ref self: S, ptrs: Span<ModelPtr<M>>);
 
     /// Returns the current namespace hash.
     fn namespace_hash(self: @S) -> felt252;
@@ -45,8 +54,16 @@ pub trait ModelValueStorage<S, V> {
     /// Updates a model value of type `V`.
     fn write_value<K, +Drop<K>, +Serde<K>, +ModelValueKey<V, K>>(ref self: S, key: K, value: @V);
 
+    /// Updates multiple model values of type `V`.
+    fn write_values<K, +Drop<K>, +Serde<K>, +ModelValueKey<V, K>>(
+        ref self: S, keys: Span<K>, values: Span<@V>
+    );
+
     /// Updates a model value of type `V`.
     fn write_value_from_id(ref self: S, entity_id: felt252, value: @V);
+
+    /// Updates multiple model values of type `V`.
+    fn write_values_from_ids(ref self: S, entity_ids: Span<felt252>, values: Span<@V>);
 }
 
 /// A `ModelStorage` trait that abstracts where the storage is.
@@ -56,10 +73,21 @@ pub trait ModelValueStorage<S, V> {
 pub trait ModelStorageTest<S, M> {
     /// Sets a model of type `M`.
     fn write_model_test(ref self: S, model: @M);
+
+    /// Sets multiple models of type `M`.
+    fn write_models_test(ref self: S, models: Span<@M>);
+
     /// Deletes a model of type `M`.
     fn erase_model_test(ref self: S, model: @M);
+
+    /// Deletes multiple models of type `M`.
+    fn erase_models_test(ref self: S, models: Span<@M>);
+
     /// Deletes a model of type `M` using the provided entity id.
     fn erase_model_ptr_test(ref self: S, ptr: ModelPtr<M>);
+
+    /// Deletes multiple models of type `M` using the provided entity ids.
+    fn erase_models_ptrs_test(ref self: S, ptrs: Span<ModelPtr<M>>);
 }
 
 /// A `ModelValueStorageTest` trait that abstracts where the storage is and bypass the permission
@@ -69,8 +97,15 @@ pub trait ModelValueStorageTest<S, V> {
     fn write_value_test<K, +Drop<K>, +Serde<K>, +ModelValueKey<V, K>>(
         ref self: S, key: K, value: @V
     );
+
+    /// Updates multiple model values of type `V`.
+    fn write_values_test<K, +Drop<K>, +Serde<K>, +ModelValueKey<V, K>>(
+        ref self: S, keys: Span<K>, values: Span<@V>
+    );
+
     /// Updates a model value of type `V`.
     fn write_value_from_id_test(ref self: S, entity_id: felt252, value: @V);
-    /// Deletes a model value of type `V`.
-    fn erase_value_from_id_test(ref self: S, entity_id: felt252);
+
+    /// Updates multiple model values of type `V`.
+    fn write_values_from_ids_test(ref self: S, entity_ids: Span<felt252>, values: Span<@V>);
 }

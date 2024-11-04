@@ -199,9 +199,9 @@ pub mod bar {
             self
                 .world
                 .read()
-                .delete_entity(
+                .delete_entities(
                     Model::<Foo>::selector(DOJO_NSH),
-                    ModelIndex::Keys([get_caller_address().into()].span()),
+                    [ModelIndex::Keys([get_caller_address().into()].span())].span(),
                     Model::<Foo>::layout()
                 );
         }

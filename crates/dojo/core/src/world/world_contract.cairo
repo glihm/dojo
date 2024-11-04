@@ -281,39 +281,72 @@ pub mod world {
     #[cfg(target: "test")]
     #[abi(embed_v0)]
     impl WorldTestImpl of dojo::world::IWorldTest<ContractState> {
-        fn set_entity_test(
+        fn set_entities_test(
             ref self: ContractState,
             model_selector: felt252,
-            index: ModelIndex,
-            values: Span<felt252>,
+            indexes: Span<ModelIndex>,
+            values: Span<Span<felt252>>,
             layout: Layout
         ) {
-            self.set_entity_internal(model_selector, index, values, layout);
+            let mut i = 0;
+
+            loop {
+                if i >= indexes.len() {
+                    break;
+                }
+
+                self.set_entity_internal(model_selector, *indexes[i], *values[i], layout);
+
+                i += 1;
+            };
         }
 
-        fn delete_entity_test(
-            ref self: ContractState, model_selector: felt252, index: ModelIndex, layout: Layout
+        fn delete_entities_test(
+            ref self: ContractState,
+            model_selector: felt252,
+            indexes: Span<ModelIndex>,
+            layout: Layout
         ) {
-            self.delete_entity_internal(model_selector, index, layout);
+            let mut i = 0;
+
+            loop {
+                if i >= indexes.len() {
+                    break;
+                }
+
+                self.delete_entity_internal(model_selector, *indexes[i], layout);
+
+                i += 1;
+            };
         }
 
-        fn emit_event_test(
+        fn emit_events_test(
             ref self: ContractState,
             event_selector: felt252,
-            keys: Span<felt252>,
-            values: Span<felt252>,
+            keys: Span<Span<felt252>>,
+            values: Span<Span<felt252>>,
             historical: bool
         ) {
-            self
-                .emit(
-                    EventEmitted {
-                        selector: event_selector,
-                        system_address: get_caller_address(),
-                        historical,
-                        keys,
-                        values
-                    }
-                );
+            let mut i = 0;
+
+            loop {
+                if i >= keys.len() {
+                    break;
+                }
+
+                self
+                    .emit(
+                        EventEmitted {
+                            selector: event_selector,
+                            system_address: get_caller_address(),
+                            historical,
+                            keys: *keys[i],
+                            values: *values[i]
+                        }
+                    );
+
+                i += 1;
+            };
         }
 
         fn dojo_contract_address(
@@ -779,26 +812,42 @@ pub mod world {
             current
         }
 
-        fn emit_event(
+        fn emit_events(
             ref self: ContractState,
             event_selector: felt252,
-            keys: Span<felt252>,
-            values: Span<felt252>,
+            keys: Span<Span<felt252>>,
+            values: Span<Span<felt252>>,
             historical: bool
         ) {
             if let Resource::Event((_, _)) = self.resources.read(event_selector) {
                 self.assert_caller_permissions(event_selector, Permission::Writer);
 
-                self
-                    .emit(
-                        EventEmitted {
-                            selector: event_selector,
-                            system_address: get_caller_address(),
-                            historical,
-                            keys,
-                            values,
-                        }
+                if keys.len() != values.len() {
+                    panic_with_byte_array(
+                        @errors::sizes_expected_to_match(@"keys", @"values", @"emit_events")
                     );
+                }
+
+                let mut i = 0;
+
+                loop {
+                    if i >= keys.len() {
+                        break;
+                    }
+
+                    self
+                        .emit(
+                            EventEmitted {
+                                selector: event_selector,
+                                system_address: get_caller_address(),
+                                historical,
+                                keys: *keys[i],
+                                values: *values[i],
+                            }
+                        );
+
+                    i += 1;
+                }
             } else {
                 panic_with_byte_array(
                     @errors::resource_conflict(@format!("{event_selector}"), @"event")
@@ -827,18 +876,31 @@ pub mod world {
             }
         }
 
-        // set_entities_batch. (check acl once, set batch).
-
-        fn set_entity(
+        fn set_entities(
             ref self: ContractState,
             model_selector: felt252,
-            index: ModelIndex,
-            values: Span<felt252>,
+            indexes: Span<ModelIndex>,
+            values: Span<Span<felt252>>,
             layout: Layout
         ) {
             if let Resource::Model((_, _)) = self.resources.read(model_selector) {
                 self.assert_caller_permissions(model_selector, Permission::Writer);
-                self.set_entity_internal(model_selector, index, values, layout);
+
+                if indexes.len() != values.len() {
+                    panic_with_byte_array(
+                        @errors::sizes_expected_to_match(@"indexes", @"values", @"set_entities")
+                    );
+                }
+
+                let mut i = 0;
+                loop {
+                    if i >= indexes.len() {
+                        break;
+                    }
+
+                    self.set_entity_internal(model_selector, *indexes[i], *values[i], layout);
+                    i += 1;
+                }
             } else {
                 panic_with_byte_array(
                     @errors::resource_conflict(@format!("{model_selector}"), @"model")
@@ -846,12 +908,23 @@ pub mod world {
             }
         }
 
-        fn delete_entity(
-            ref self: ContractState, model_selector: felt252, index: ModelIndex, layout: Layout
+        fn delete_entities(
+            ref self: ContractState,
+            model_selector: felt252,
+            indexes: Span<ModelIndex>,
+            layout: Layout
         ) {
             if let Resource::Model((_, _)) = self.resources.read(model_selector) {
                 self.assert_caller_permissions(model_selector, Permission::Writer);
-                self.delete_entity_internal(model_selector, index, layout);
+                let mut i = 0;
+                loop {
+                    if i >= indexes.len() {
+                        break;
+                    }
+
+                    self.delete_entity_internal(model_selector, *indexes[i], layout);
+                    i += 1;
+                }
             } else {
                 panic_with_byte_array(
                     @errors::resource_conflict(@format!("{model_selector}"), @"model")

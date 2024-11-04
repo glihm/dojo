@@ -47,11 +47,31 @@ pub impl WorldStorageInternalImpl of WorldStorageTrait {
 
 pub impl EventStorageWorldStorageImpl<E, +Event<E>> of EventStorage<WorldStorage, E> {
     fn emit_event(ref self: WorldStorage, event: @E) {
-        dojo::world::IWorldDispatcherTrait::emit_event(
+        let events: Array<@E> = array![event];
+        Self::emit_events(ref self, events.span());
+    }
+
+    fn emit_events(ref self: WorldStorage, events: Span<@E>) {
+        let mut all_keys: Array<Span<felt252>> = array![];
+        let mut all_values: Array<Span<felt252>> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= events.len() {
+                break;
+            }
+
+            all_keys.append(Event::<E>::keys(*events[i]));
+            all_values.append(Event::<E>::values(*events[i]));
+
+            i += 1;
+        };
+
+        dojo::world::IWorldDispatcherTrait::emit_events(
             self.dispatcher,
             Event::<E>::selector(self.namespace_hash),
-            Event::<E>::keys(event),
-            Event::<E>::values(event),
+            all_keys.span(),
+            all_values.span(),
             Event::<E>::historical()
         );
     }
@@ -77,34 +97,91 @@ pub impl ModelStorageWorldStorageImpl<M, +Model<M>, +Drop<M>> of ModelStorage<Wo
     }
 
     fn write_model(ref self: WorldStorage, model: @M) {
-        IWorldDispatcherTrait::set_entity(
+        let models: Array<@M> = array![model];
+        Self::write_models(ref self, models.span());
+    }
+
+    fn write_models(ref self: WorldStorage, models: Span<@M>) {
+        let mut keys: Array<ModelIndex> = array![];
+        let mut values: Array<Span<felt252>> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= models.len() {
+                break;
+            }
+
+            keys.append(ModelIndex::Keys(Model::<M>::keys(*models[i])));
+            values.append(Model::<M>::values(*models[i]));
+
+            i += 1;
+        };
+
+        IWorldDispatcherTrait::set_entities(
             self.dispatcher,
             Model::<M>::selector(self.namespace_hash),
-            ModelIndex::Keys(Model::<M>::keys(model)),
-            Model::<M>::values(model),
+            keys.span(),
+            values.span(),
             Model::<M>::layout()
         );
     }
 
     fn erase_model(ref self: WorldStorage, model: @M) {
-        IWorldDispatcherTrait::delete_entity(
+        let models: Array<@M> = array![model];
+        Self::erase_models(ref self, models.span());
+    }
+
+    fn erase_models(ref self: WorldStorage, models: Span<@M>) {
+        let mut keys: Array<ModelIndex> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= models.len() {
+                break;
+            }
+
+            keys.append(ModelIndex::Keys(Model::<M>::keys(*models[i])));
+
+            i += 1;
+        };
+
+        IWorldDispatcherTrait::delete_entities(
             self.dispatcher,
             Model::<M>::selector(self.namespace_hash),
-            ModelIndex::Keys(Model::<M>::keys(model)),
+            keys.span(),
             Model::<M>::layout()
         );
     }
 
     fn erase_model_ptr(ref self: WorldStorage, ptr: ModelPtr<M>) {
-        let entity_id = match ptr {
-            ModelPtr::Id(id) => id,
-            ModelPtr::Keys(keys) => entity_id_from_keys(keys),
+        let ptrs: Array<ModelPtr<M>> = array![ptr];
+        Self::erase_models_ptrs(ref self, ptrs.span());
+    }
+
+    fn erase_models_ptrs(ref self: WorldStorage, ptrs: Span<ModelPtr<M>>) {
+        let mut ids: Array<ModelIndex> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= ptrs.len() {
+                break;
+            }
+
+            ids
+                .append(
+                    match ptrs[i] {
+                        ModelPtr::Id(id) => ModelIndex::Id(*id),
+                        ModelPtr::Keys(keys) => ModelIndex::Id(entity_id_from_keys(*keys)),
+                    }
+                );
+
+            i += 1;
         };
 
-        IWorldDispatcherTrait::delete_entity(
+        IWorldDispatcherTrait::delete_entities(
             self.dispatcher,
             Model::<M>::selector(self.namespace_hash),
-            ModelIndex::Id(entity_id),
+            ids.span(),
             Model::<M>::layout()
         );
     }
@@ -141,22 +218,65 @@ impl ModelValueStorageWorldStorageImpl<
     fn write_value<K, +Drop<K>, +Serde<K>, +ModelValueKey<V, K>>(
         ref self: WorldStorage, key: K, value: @V
     ) {
-        IWorldDispatcherTrait::set_entity(
+        let keys: Array<K> = array![key];
+        let values: Array<@V> = array![value];
+        Self::write_values(ref self, keys.span(), values.span());
+    }
+
+    fn write_values<K, +Drop<K>, +Serde<K>, +ModelValueKey<V, K>>(
+        ref self: WorldStorage, keys: Span<K>, values: Span<@V>
+    ) {
+        let mut all_keys: Array<ModelIndex> = array![];
+        let mut all_values: Array<Span<felt252>> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= keys.len() {
+                break;
+            }
+
+            all_keys.append(ModelIndex::Id(entity_id_from_keys(serialize_inline::<K>(keys[i]))));
+            all_values.append(ModelValue::<V>::values(*values[i]));
+
+            i += 1;
+        };
+
+        IWorldDispatcherTrait::set_entities(
             self.dispatcher,
             ModelValue::<V>::selector(self.namespace_hash),
-            // We need Id here to trigger the store update event.
-            ModelIndex::Id(entity_id_from_keys(serialize_inline::<K>(@key))),
-            ModelValue::<V>::values(value),
+            all_keys.span(),
+            all_values.span(),
             ModelValue::<V>::layout()
         );
     }
 
     fn write_value_from_id(ref self: WorldStorage, entity_id: felt252, value: @V) {
-        IWorldDispatcherTrait::set_entity(
+        let entity_ids: Array<felt252> = array![entity_id];
+        let values: Array<@V> = array![value];
+        Self::write_values_from_ids(ref self, entity_ids.span(), values.span());
+    }
+
+    fn write_values_from_ids(ref self: WorldStorage, entity_ids: Span<felt252>, values: Span<@V>) {
+        let mut all_keys: Array<ModelIndex> = array![];
+        let mut all_values: Array<Span<felt252>> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= entity_ids.len() {
+                break;
+            }
+
+            all_keys.append(ModelIndex::Id(*entity_ids[i]));
+            all_values.append(ModelValue::<V>::values(*values[i]));
+
+            i += 1;
+        };
+
+        IWorldDispatcherTrait::set_entities(
             self.dispatcher,
             ModelValue::<V>::selector(self.namespace_hash),
-            ModelIndex::Id(entity_id),
-            ModelValue::<V>::values(value),
+            all_keys.span(),
+            all_values.span(),
             ModelValue::<V>::layout()
         );
     }
@@ -167,14 +287,35 @@ pub impl EventStorageTestWorldStorageImpl<
     E, +Event<E>
 > of dojo::event::EventStorageTest<WorldStorage, E> {
     fn emit_event_test(ref self: WorldStorage, event: @E) {
+        let events: Array<@E> = array![event];
+        Self::emit_events_test(ref self, events.span());
+    }
+
+    fn emit_events_test(ref self: WorldStorage, events: Span<@E>) {
+        let mut all_keys: Array<Span<felt252>> = array![];
+        let mut all_values: Array<Span<felt252>> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= events.len() {
+                break;
+            }
+
+            all_keys.append(Event::<E>::keys(*events[i]));
+            all_values.append(Event::<E>::values(*events[i]));
+
+            i += 1;
+        };
+
         let world_test = dojo::world::IWorldTestDispatcher {
             contract_address: self.dispatcher.contract_address
         };
-        dojo::world::IWorldTestDispatcherTrait::emit_event_test(
+
+        dojo::world::IWorldTestDispatcherTrait::emit_events_test(
             world_test,
             Event::<E>::selector(self.namespace_hash),
-            Event::<E>::keys(event),
-            Event::<E>::values(event),
+            all_keys.span(),
+            all_values.span(),
             Event::<E>::historical()
         );
     }
@@ -190,11 +331,40 @@ pub impl ModelStorageTestWorldStorageImpl<
         let world_test = dojo::world::IWorldTestDispatcher {
             contract_address: self.dispatcher.contract_address
         };
-        dojo::world::IWorldTestDispatcherTrait::set_entity_test(
+        dojo::world::IWorldTestDispatcherTrait::set_entities_test(
             world_test,
             Model::<M>::selector(self.namespace_hash),
-            ModelIndex::Keys(Model::keys(model)),
-            Model::<M>::values(model),
+            [ModelIndex::Keys(Model::keys(model))].span(),
+            [Model::<M>::values(model)].span(),
+            Model::<M>::layout()
+        );
+    }
+
+    fn write_models_test(ref self: WorldStorage, models: Span<@M>) {
+        let mut keys: Array<ModelIndex> = array![];
+        let mut values: Array<Span<felt252>> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= models.len() {
+                break;
+            }
+
+            keys.append(ModelIndex::Keys(Model::<M>::keys(*models[i])));
+            values.append(Model::<M>::values(*models[i]));
+
+            i += 1;
+        };
+
+        let world_test = dojo::world::IWorldTestDispatcher {
+            contract_address: self.dispatcher.contract_address
+        };
+
+        dojo::world::IWorldTestDispatcherTrait::set_entities_test(
+            world_test,
+            Model::<M>::selector(self.namespace_hash),
+            keys.span(),
+            values.span(),
             Model::<M>::layout()
         );
     }
@@ -204,11 +374,34 @@ pub impl ModelStorageTestWorldStorageImpl<
             contract_address: self.dispatcher.contract_address
         };
 
-        dojo::world::IWorldTestDispatcherTrait::delete_entity_test(
+        dojo::world::IWorldTestDispatcherTrait::delete_entities_test(
             world_test,
             Model::<M>::selector(self.namespace_hash),
-            ModelIndex::Keys(Model::keys(model)),
+            [ModelIndex::Keys(Model::keys(model))].span(),
             Model::<M>::layout()
+        );
+    }
+
+    fn erase_models_test(ref self: WorldStorage, models: Span<@M>) {
+        let mut keys: Array<ModelIndex> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= models.len() {
+                break;
+            }
+
+            keys.append(ModelIndex::Keys(Model::<M>::keys(*models[i])));
+
+            i += 1;
+        };
+
+        let world_test = dojo::world::IWorldTestDispatcher {
+            contract_address: self.dispatcher.contract_address
+        };
+
+        dojo::world::IWorldTestDispatcherTrait::delete_entities_test(
+            world_test, Model::<M>::selector(self.namespace_hash), keys.span(), Model::<M>::layout()
         );
     }
 
@@ -222,11 +415,40 @@ pub impl ModelStorageTestWorldStorageImpl<
             contract_address: self.dispatcher.contract_address
         };
 
-        dojo::world::IWorldTestDispatcherTrait::delete_entity_test(
+        dojo::world::IWorldTestDispatcherTrait::delete_entities_test(
             world_test,
             Model::<M>::selector(self.namespace_hash),
-            ModelIndex::Id(entity_id),
+            [ModelIndex::Id(entity_id)].span(),
             Model::<M>::layout()
+        );
+    }
+
+    fn erase_models_ptrs_test(ref self: WorldStorage, ptrs: Span<ModelPtr<M>>) {
+        let mut ids: Array<ModelIndex> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= ptrs.len() {
+                break;
+            }
+
+            ids
+                .append(
+                    match ptrs[i] {
+                        ModelPtr::Id(id) => ModelIndex::Id(*id),
+                        ModelPtr::Keys(keys) => ModelIndex::Id(entity_id_from_keys(*keys)),
+                    }
+                );
+
+            i += 1;
+        };
+
+        let world_test = dojo::world::IWorldTestDispatcher {
+            contract_address: self.dispatcher.contract_address
+        };
+
+        dojo::world::IWorldTestDispatcherTrait::delete_entities_test(
+            world_test, Model::<M>::selector(self.namespace_hash), ids.span(), Model::<M>::layout()
         );
     }
 }
@@ -240,33 +462,75 @@ pub impl ModelValueStorageTestWorldStorageImpl<
     fn write_value_test<K, +Drop<K>, +Serde<K>, +ModelValueKey<V, K>>(
         ref self: WorldStorage, key: K, value: @V
     ) {
-        let keys = serialize_inline::<K>(@key);
-        Self::write_value_from_id_test(ref self, dojo::utils::entity_id_from_keys(keys), value);
+        let keys: Array<K> = array![key];
+        let values: Array<@V> = array![value];
+        Self::write_values_test(ref self, keys.span(), values.span());
     }
 
-    fn write_value_from_id_test(ref self: WorldStorage, entity_id: felt252, value: @V) {
+    fn write_values_test<K, +Drop<K>, +Serde<K>, +ModelValueKey<V, K>>(
+        ref self: WorldStorage, keys: Span<K>, values: Span<@V>
+    ) {
+        let mut all_keys: Array<ModelIndex> = array![];
+        let mut all_values: Array<Span<felt252>> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= keys.len() {
+                break;
+            }
+
+            all_keys.append(ModelIndex::Id(entity_id_from_keys(serialize_inline::<K>(keys[i]))));
+            all_values.append(ModelValue::<V>::values(*values[i]));
+
+            i += 1;
+        };
+
         let world_test = dojo::world::IWorldTestDispatcher {
             contract_address: self.dispatcher.contract_address
         };
 
-        dojo::world::IWorldTestDispatcherTrait::set_entity_test(
+        dojo::world::IWorldTestDispatcherTrait::set_entities_test(
             world_test,
             ModelValue::<V>::selector(self.namespace_hash),
-            ModelIndex::Id(entity_id),
-            ModelValue::<V>::values(value),
+            all_keys.span(),
+            all_values.span(),
             ModelValue::<V>::layout()
         );
     }
 
-    fn erase_value_from_id_test(ref self: WorldStorage, entity_id: felt252) {
+    fn write_value_from_id_test(ref self: WorldStorage, entity_id: felt252, value: @V) {
+        let entity_ids: Array<felt252> = array![entity_id];
+        let values: Array<@V> = array![value];
+        Self::write_values_from_ids_test(ref self, entity_ids.span(), values.span());
+    }
+
+    fn write_values_from_ids_test(
+        ref self: WorldStorage, entity_ids: Span<felt252>, values: Span<@V>
+    ) {
+        let mut all_keys: Array<ModelIndex> = array![];
+        let mut all_values: Array<Span<felt252>> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= entity_ids.len() {
+                break;
+            }
+
+            all_keys.append(ModelIndex::Id(*entity_ids[i]));
+            all_values.append(ModelValue::<V>::values(*values[i]));
+
+            i += 1;
+        };
+
         let world_test = dojo::world::IWorldTestDispatcher {
             contract_address: self.dispatcher.contract_address
         };
 
-        dojo::world::IWorldTestDispatcherTrait::delete_entity_test(
+        dojo::world::IWorldTestDispatcherTrait::set_entities_test(
             world_test,
             ModelValue::<V>::selector(self.namespace_hash),
-            ModelIndex::Id(entity_id),
+            all_keys.span(),
+            all_values.span(),
             ModelValue::<V>::layout()
         );
     }
@@ -283,8 +547,12 @@ fn update_serialized_member(
 ) {
     match find_model_field_layout(layout, member_id) {
         Option::Some(field_layout) => {
-            IWorldDispatcherTrait::set_entity(
-                world, model_id, ModelIndex::MemberId((entity_id, member_id)), values, field_layout,
+            IWorldDispatcherTrait::set_entities(
+                world,
+                model_id,
+                [ModelIndex::MemberId((entity_id, member_id))].span(),
+                [values].span(),
+                field_layout,
             )
         },
         Option::None => panic_with_felt252('bad member id')

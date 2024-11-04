@@ -117,21 +117,19 @@ pub trait IWorld<T> {
     /// * `class_hash` - The class hash of the contract.
     fn upgrade_contract(ref self: T, namespace: ByteArray, class_hash: ClassHash) -> ClassHash;
 
-    /// Emits a custom event that was previously registered in the world.
-    /// The dojo event emission is permissioned, since data are collected by
-    /// Torii and served to clients.
+    /// Emits multiple events, permissions are checked once.
     ///
     /// # Arguments
     ///
     /// * `event_selector` - The selector of the event.
-    /// * `keys` - The keys of the event.
-    /// * `values` - The data to be logged by the event.
-    /// * `historical` - Whether the event should be logged in historical mode.
-    fn emit_event(
+    /// * `keys` - The keys of the events.
+    /// * `values` - The data to be logged by the events.
+    /// * `historical` - Whether the events should be logged in historical mode.
+    fn emit_events(
         ref self: T,
         event_selector: felt252,
-        keys: Span<felt252>,
-        values: Span<felt252>,
+        keys: Span<Span<felt252>>,
+        values: Span<Span<felt252>>,
         historical: bool
     );
 
@@ -151,31 +149,35 @@ pub trait IWorld<T> {
         self: @T, model_selector: felt252, index: ModelIndex, layout: Layout
     ) -> Span<felt252>;
 
-    /// Sets the model value for the given entity/member.
+    /// Sets the model values for the given entities.
+    /// Permissions are checked once.
     ///
     /// # Arguments
     ///
     /// * `model_selector` - The selector of the model to be set.
-    /// * `index` - The index of the entity/member to write.
-    /// * `values` - The value to be set, serialized using the model layout format.
+    /// * `indexes` - The indexes of the entities/members to write.
+    /// * `values` - The values to be set, serialized using the model layout format.
     /// * `layout` - The memory layout of the model.
-    fn set_entity(
+    fn set_entities(
         ref self: T,
         model_selector: felt252,
-        index: ModelIndex,
-        values: Span<felt252>,
+        indexes: Span<ModelIndex>,
+        values: Span<Span<felt252>>,
         layout: Layout
     );
 
-    /// Deletes a model value for the given entity/member.
-    /// Deleting is setting all the values to 0 in the given layout.
+    /// Deletes the model values for the given entities.
+    /// Permissions are checked once.
     ///
     /// # Arguments
     ///
-    /// * `model_selector` - The selector of the model to be deleted.
-    /// * `index` - The index of the entity/member to delete.
+    /// * `model_selector` - The sele
+    /// ctor of the model to be deleted.
+    /// * `indexes` - The indexes of the entities/members to delete.
     /// * `layout` - The memory layout of the model.
-    fn delete_entity(ref self: T, model_selector: felt252, index: ModelIndex, layout: Layout);
+    fn delete_entities(
+        ref self: T, model_selector: felt252, indexes: Span<ModelIndex>, layout: Layout
+    );
 
     /// Returns true if the provided account has owner permission for the resource, false otherwise.
     ///
@@ -206,7 +208,6 @@ pub trait IWorld<T> {
     /// * `resource` - The selector of the resource.
     /// * `address` - The address of the contract to revoke owner permission from.
     fn revoke_owner(ref self: T, resource: felt252, address: ContractAddress);
-
 
     /// Returns true if the provided contract has writer permission for the resource, false
     /// otherwise.
@@ -244,24 +245,26 @@ pub trait IWorld<T> {
 #[cfg(target: "test")]
 pub trait IWorldTest<T> {
     /// Sets the model value for the given entity/member without checking for resource permissions.
-    fn set_entity_test(
+    fn set_entities_test(
         ref self: T,
         model_selector: felt252,
-        index: ModelIndex,
-        values: Span<felt252>,
+        indexes: Span<ModelIndex>,
+        values: Span<Span<felt252>>,
         layout: Layout
     );
 
     /// Deletes a model value for the given entity/member without checking for resource permissions.
-    fn delete_entity_test(ref self: T, model_selector: felt252, index: ModelIndex, layout: Layout);
+    fn delete_entities_test(
+        ref self: T, model_selector: felt252, indexes: Span<ModelIndex>, layout: Layout
+    );
 
     /// Emits a custom event that was previously registered in the world without checking for
     /// resource permissions.
-    fn emit_event_test(
+    fn emit_events_test(
         ref self: T,
         event_selector: felt252,
-        keys: Span<felt252>,
-        values: Span<felt252>,
+        keys: Span<Span<felt252>>,
+        values: Span<Span<felt252>>,
         historical: bool
     );
 
