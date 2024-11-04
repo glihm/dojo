@@ -26,6 +26,9 @@ pub trait ModelStorage<S, M> {
     /// Retrieves a model of type `M` using the provided key of type `K`.
     fn read_model<K, +Drop<K>, +Serde<K>>(self: @S, key: K) -> M;
 
+    /// Retrieves multiple models of type `M` using the provided keys of type `K`.
+    fn read_models<K, +Drop<K>, +Serde<K>>(self: @S, keys: Span<K>) -> Span<M>;
+
     /// Deletes a model of type `M`.
     fn erase_model(ref self: S, model: @M);
 

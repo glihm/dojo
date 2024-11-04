@@ -133,21 +133,21 @@ pub trait IWorld<T> {
         historical: bool
     );
 
-    /// Gets the values of a model entity/member.
+    /// Gets the values of a model entities.
     /// Returns a zero initialized model value if the entity/member has not been set.
     ///
     /// # Arguments
     ///
     /// * `model_selector` - The selector of the model to be retrieved.
-    /// * `index` - The index of the entity/member to read.
+    /// * `indexes` - The indexes of the entities/members to read.
     /// * `layout` - The memory layout of the model.
     ///
     /// # Returns
     ///
-    /// * `Span<felt252>` - The serialized value of the model, zero initialized if not set.
-    fn entity(
-        self: @T, model_selector: felt252, index: ModelIndex, layout: Layout
-    ) -> Span<felt252>;
+    /// * `Span<Span<felt252>>` - The serialized values of the model, zero initialized if not set.
+    fn entities(
+        self: @T, model_selector: felt252, indexes: Span<ModelIndex>, layout: Layout
+    ) -> Span<Span<felt252>>;
 
     /// Sets the model values for the given entities.
     /// Permissions are checked once.

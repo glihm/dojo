@@ -53,8 +53,9 @@ async fn migrate_spawn_and_move(db_path: &Path) -> Result<Manifest> {
 
     if deterministic_world_address != config_world_address {
         panic!(
-            "The deterministic world address is different from the config world address. Please \
-             review the `dojo_dev.toml` file of spawn-and-move example."
+            "The deterministic world address ({:#066x}) is different from the config world \
+             address ({:#066x}). Please review the `dojo_dev.toml` file of spawn-and-move example.",
+            deterministic_world_address, config_world_address
         );
     }
 

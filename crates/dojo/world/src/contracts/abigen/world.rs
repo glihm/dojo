@@ -3342,82 +3342,82 @@ impl<A: starknet::accounts::ConnectedAccount + Sync> WorldContract<A> {
     }
     #[allow(clippy::ptr_arg)]
     #[allow(clippy::too_many_arguments)]
-    pub fn delete_entity_getcall(
+    pub fn delete_entities_getcall(
         &self,
         model_selector: &starknet::core::types::Felt,
-        index: &ModelIndex,
+        indexes: &Vec<ModelIndex>,
         layout: &Layout,
     ) -> starknet::core::types::Call {
         use cainome::cairo_serde::CairoSerde;
         let mut __calldata = vec![];
         __calldata.extend(starknet::core::types::Felt::cairo_serialize(model_selector));
-        __calldata.extend(ModelIndex::cairo_serialize(index));
+        __calldata.extend(Vec::<ModelIndex>::cairo_serialize(indexes));
         __calldata.extend(Layout::cairo_serialize(layout));
         starknet::core::types::Call {
             to: self.address,
-            selector: starknet::macros::selector!("delete_entity"),
+            selector: starknet::macros::selector!("delete_entities"),
             calldata: __calldata,
         }
     }
     #[allow(clippy::ptr_arg)]
     #[allow(clippy::too_many_arguments)]
-    pub fn delete_entity(
+    pub fn delete_entities(
         &self,
         model_selector: &starknet::core::types::Felt,
-        index: &ModelIndex,
+        indexes: &Vec<ModelIndex>,
         layout: &Layout,
     ) -> starknet::accounts::ExecutionV1<A> {
         use cainome::cairo_serde::CairoSerde;
         let mut __calldata = vec![];
         __calldata.extend(starknet::core::types::Felt::cairo_serialize(model_selector));
-        __calldata.extend(ModelIndex::cairo_serialize(index));
+        __calldata.extend(Vec::<ModelIndex>::cairo_serialize(indexes));
         __calldata.extend(Layout::cairo_serialize(layout));
         let __call = starknet::core::types::Call {
             to: self.address,
-            selector: starknet::macros::selector!("delete_entity"),
+            selector: starknet::macros::selector!("delete_entities"),
             calldata: __calldata,
         };
         self.account.execute_v1(vec![__call])
     }
     #[allow(clippy::ptr_arg)]
     #[allow(clippy::too_many_arguments)]
-    pub fn emit_event_getcall(
+    pub fn emit_events_getcall(
         &self,
         event_selector: &starknet::core::types::Felt,
-        keys: &Vec<starknet::core::types::Felt>,
-        values: &Vec<starknet::core::types::Felt>,
+        keys: &Vec<Vec<starknet::core::types::Felt>>,
+        values: &Vec<Vec<starknet::core::types::Felt>>,
         historical: &bool,
     ) -> starknet::core::types::Call {
         use cainome::cairo_serde::CairoSerde;
         let mut __calldata = vec![];
         __calldata.extend(starknet::core::types::Felt::cairo_serialize(event_selector));
-        __calldata.extend(Vec::<starknet::core::types::Felt>::cairo_serialize(keys));
-        __calldata.extend(Vec::<starknet::core::types::Felt>::cairo_serialize(values));
+        __calldata.extend(Vec::<Vec<starknet::core::types::Felt>>::cairo_serialize(keys));
+        __calldata.extend(Vec::<Vec<starknet::core::types::Felt>>::cairo_serialize(values));
         __calldata.extend(bool::cairo_serialize(historical));
         starknet::core::types::Call {
             to: self.address,
-            selector: starknet::macros::selector!("emit_event"),
+            selector: starknet::macros::selector!("emit_events"),
             calldata: __calldata,
         }
     }
     #[allow(clippy::ptr_arg)]
     #[allow(clippy::too_many_arguments)]
-    pub fn emit_event(
+    pub fn emit_events(
         &self,
         event_selector: &starknet::core::types::Felt,
-        keys: &Vec<starknet::core::types::Felt>,
-        values: &Vec<starknet::core::types::Felt>,
+        keys: &Vec<Vec<starknet::core::types::Felt>>,
+        values: &Vec<Vec<starknet::core::types::Felt>>,
         historical: &bool,
     ) -> starknet::accounts::ExecutionV1<A> {
         use cainome::cairo_serde::CairoSerde;
         let mut __calldata = vec![];
         __calldata.extend(starknet::core::types::Felt::cairo_serialize(event_selector));
-        __calldata.extend(Vec::<starknet::core::types::Felt>::cairo_serialize(keys));
-        __calldata.extend(Vec::<starknet::core::types::Felt>::cairo_serialize(values));
+        __calldata.extend(Vec::<Vec<starknet::core::types::Felt>>::cairo_serialize(keys));
+        __calldata.extend(Vec::<Vec<starknet::core::types::Felt>>::cairo_serialize(values));
         __calldata.extend(bool::cairo_serialize(historical));
         let __call = starknet::core::types::Call {
             to: self.address,
-            selector: starknet::macros::selector!("emit_event"),
+            selector: starknet::macros::selector!("emit_events"),
             calldata: __calldata,
         };
         self.account.execute_v1(vec![__call])
@@ -3739,43 +3739,43 @@ impl<A: starknet::accounts::ConnectedAccount + Sync> WorldContract<A> {
     }
     #[allow(clippy::ptr_arg)]
     #[allow(clippy::too_many_arguments)]
-    pub fn set_entity_getcall(
+    pub fn set_entities_getcall(
         &self,
         model_selector: &starknet::core::types::Felt,
-        index: &ModelIndex,
-        values: &Vec<starknet::core::types::Felt>,
+        indexes: &Vec<ModelIndex>,
+        values: &Vec<Vec<starknet::core::types::Felt>>,
         layout: &Layout,
     ) -> starknet::core::types::Call {
         use cainome::cairo_serde::CairoSerde;
         let mut __calldata = vec![];
         __calldata.extend(starknet::core::types::Felt::cairo_serialize(model_selector));
-        __calldata.extend(ModelIndex::cairo_serialize(index));
-        __calldata.extend(Vec::<starknet::core::types::Felt>::cairo_serialize(values));
+        __calldata.extend(Vec::<ModelIndex>::cairo_serialize(indexes));
+        __calldata.extend(Vec::<Vec<starknet::core::types::Felt>>::cairo_serialize(values));
         __calldata.extend(Layout::cairo_serialize(layout));
         starknet::core::types::Call {
             to: self.address,
-            selector: starknet::macros::selector!("set_entity"),
+            selector: starknet::macros::selector!("set_entities"),
             calldata: __calldata,
         }
     }
     #[allow(clippy::ptr_arg)]
     #[allow(clippy::too_many_arguments)]
-    pub fn set_entity(
+    pub fn set_entities(
         &self,
         model_selector: &starknet::core::types::Felt,
-        index: &ModelIndex,
-        values: &Vec<starknet::core::types::Felt>,
+        indexes: &Vec<ModelIndex>,
+        values: &Vec<Vec<starknet::core::types::Felt>>,
         layout: &Layout,
     ) -> starknet::accounts::ExecutionV1<A> {
         use cainome::cairo_serde::CairoSerde;
         let mut __calldata = vec![];
         __calldata.extend(starknet::core::types::Felt::cairo_serialize(model_selector));
-        __calldata.extend(ModelIndex::cairo_serialize(index));
-        __calldata.extend(Vec::<starknet::core::types::Felt>::cairo_serialize(values));
+        __calldata.extend(Vec::<ModelIndex>::cairo_serialize(indexes));
+        __calldata.extend(Vec::<Vec<starknet::core::types::Felt>>::cairo_serialize(values));
         __calldata.extend(Layout::cairo_serialize(layout));
         let __call = starknet::core::types::Call {
             to: self.address,
-            selector: starknet::macros::selector!("set_entity"),
+            selector: starknet::macros::selector!("set_entities"),
             calldata: __calldata,
         };
         self.account.execute_v1(vec![__call])

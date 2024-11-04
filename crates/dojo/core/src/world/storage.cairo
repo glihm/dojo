@@ -80,13 +80,16 @@ pub impl EventStorageWorldStorageImpl<E, +Event<E>> of EventStorage<WorldStorage
 pub impl ModelStorageWorldStorageImpl<M, +Model<M>, +Drop<M>> of ModelStorage<WorldStorage, M> {
     fn read_model<K, +Drop<K>, +Serde<K>>(self: @WorldStorage, key: K) -> M {
         let mut keys = serialize_inline::<K>(@key);
-        let mut values = IWorldDispatcherTrait::entity(
+        let values = IWorldDispatcherTrait::entities(
             *self.dispatcher,
             Model::<M>::selector(*self.namespace_hash),
-            ModelIndex::Keys(keys),
+            [ModelIndex::Keys(keys)].span(),
             Model::<M>::layout()
         );
-        match Model::<M>::from_values(ref keys, ref values) {
+
+        // Only one model is read, we can use the first span only.
+        let mut values_first = *values[0];
+        match Model::<M>::from_values(ref keys, ref values_first) {
             Option::Some(model) => model,
             Option::None => {
                 panic!(
@@ -94,6 +97,51 @@ pub impl ModelStorageWorldStorageImpl<M, +Model<M>, +Drop<M>> of ModelStorage<Wo
                 )
             }
         }
+    }
+
+    fn read_models<K, +Drop<K>, +Serde<K>>(self: @WorldStorage, keys: Span<K>) -> Span<M> {
+        let mut all_keys: Array<Span<felt252>> = array![];
+
+        let mut i = 0;
+        loop {
+            if i >= keys.len() {
+                break;
+            }
+
+            all_keys.append(serialize_inline::<K>(*keys[i]));
+
+            i += 1;
+        };
+
+        let all_values = IWorldDispatcherTrait::entities(
+            *self.dispatcher,
+            Model::<M>::selector(*self.namespace_hash),
+            all_keys.span(),
+            Model::<M>::layout()
+        );
+
+        let mut i = 0;
+        let mut models: Array<M> = array![];
+        loop {
+            if i >= all_values.len() {
+                break;
+            }
+
+            let mut m_values = *all_values[i];
+            let mut m_keys = *all_keys[i];
+            match Model::<M>::from_values(ref m_keys, ref m_values) {
+                Option::Some(model) => models.append(model),
+                Option::None => {
+                    panic!(
+                        "Model: deserialization failed. Ensure the length of the keys tuple is matching the number of #[key] fields in the model struct."
+                    )
+                }
+            }
+
+            i += 1;
+        };
+
+        models.span()
     }
 
     fn write_model(ref self: WorldStorage, model: @M) {

@@ -855,25 +855,42 @@ pub mod world {
             }
         }
 
-        fn entity(
-            self: @ContractState, model_selector: felt252, index: ModelIndex, layout: Layout
-        ) -> Span<felt252> {
-            match index {
-                ModelIndex::Keys(keys) => {
-                    let entity_id = entity_id_from_keys(keys);
-                    storage::entity_model::read_model_entity(model_selector, entity_id, layout)
-                },
-                ModelIndex::Id(entity_id) => {
-                    storage::entity_model::read_model_entity(model_selector, entity_id, layout)
-                },
-                ModelIndex::MemberId((
-                    entity_id, member_id
-                )) => {
-                    storage::entity_model::read_model_member(
-                        model_selector, entity_id, member_id, layout
-                    )
+        fn entities(
+            self: @ContractState, model_selector: felt252, indexes: Span<ModelIndex>, layout: Layout
+        ) -> Span<Span<felt252>> {
+            let mut results: Array<Span<felt252>> = array![];
+
+            let mut i = 0;
+
+            loop {
+                if i >= indexes.len() {
+                    break;
                 }
-            }
+
+                let index = *indexes[i];
+                i += 1;
+
+                let r = match index {
+                    ModelIndex::Keys(keys) => {
+                        let entity_id = entity_id_from_keys(keys);
+                        storage::entity_model::read_model_entity(model_selector, entity_id, layout)
+                    },
+                    ModelIndex::Id(entity_id) => {
+                        storage::entity_model::read_model_entity(model_selector, entity_id, layout)
+                    },
+                    ModelIndex::MemberId((
+                        entity_id, member_id
+                    )) => {
+                        storage::entity_model::read_model_member(
+                            model_selector, entity_id, member_id, layout
+                        )
+                    }
+                };
+
+                results.append(r);
+            };
+
+            results.span()
         }
 
         fn set_entities(
